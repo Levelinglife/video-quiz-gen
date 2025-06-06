@@ -1,85 +1,17 @@
 
 import { useState } from 'react';
+import { extractVideoId, getVideoInfo, getTranscript } from '../services/youtubeService';
+import { generateQuizFromTranscript, GeneratedQuiz } from '../services/aiService';
 
 interface QuizGeneratorProps {
-  onQuizGenerated: (quiz: any) => void;
+  onQuizGenerated: (quiz: GeneratedQuiz) => void;
 }
 
 const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Mock function to simulate AI quiz generation
-  const generateMockQuiz = (videoTitle: string) => {
-    return {
-      videoTitle,
-      videoUrl: url,
-      questions: [
-        {
-          id: 1,
-          questionText: "What is the main topic discussed in this video?",
-          options: [
-            "Introduction to React Hooks",
-            "CSS Grid Layout",
-            "JavaScript Fundamentals",
-            "Database Design"
-          ],
-          correctAnswer: "Introduction to React Hooks"
-        },
-        {
-          id: 2,
-          questionText: "Which React Hook is used for managing state?",
-          options: [
-            "useEffect",
-            "useState",
-            "useContext",
-            "useReducer"
-          ],
-          correctAnswer: "useState"
-        },
-        {
-          id: 3,
-          questionText: "What happens when you call useState?",
-          options: [
-            "It returns a single value",
-            "It returns an array with two elements",
-            "It returns an object",
-            "It returns a function"
-          ],
-          correctAnswer: "It returns an array with two elements"
-        },
-        {
-          id: 4,
-          questionText: "When should you use the useEffect Hook?",
-          options: [
-            "Only for API calls",
-            "For side effects in functional components",
-            "Only for event handlers",
-            "For styling components"
-          ],
-          correctAnswer: "For side effects in functional components"
-        },
-        {
-          id: 5,
-          questionText: "What is the dependency array in useEffect used for?",
-          options: [
-            "To pass props to components",
-            "To control when the effect runs",
-            "To store state values",
-            "To handle errors"
-          ],
-          correctAnswer: "To control when the effect runs"
-        }
-      ]
-    };
-  };
-
-  const extractVideoId = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return match && match[2].length === 11 ? match[2] : null;
-  };
+  const [currentStep, setCurrentStep] = useState('');
 
   const handleGenerateQuiz = async () => {
     if (!url.trim()) {
@@ -97,16 +29,38 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
     setError('');
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Generate mock quiz data
-      const mockQuiz = generateMockQuiz('React Hooks Tutorial - Complete Guide');
-      onQuizGenerated(mockQuiz);
+      // Step 1: Get video info
+      setCurrentStep('Fetching video information...');
+      const videoInfo = await getVideoInfo(videoId);
+      if (!videoInfo) {
+        throw new Error('Could not fetch video information');
+      }
+
+      // Step 2: Get transcript
+      setCurrentStep('Extracting video transcript...');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate processing time
+      const transcript = await getTranscript(videoId);
+      if (!transcript) {
+        throw new Error('Could not extract transcript from this video. The video may not have captions available.');
+      }
+
+      // Step 3: Generate questions with AI
+      setCurrentStep('Analyzing content and generating personalized questions...');
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate AI processing time
+      const quiz = await generateQuizFromTranscript(transcript, videoInfo.title, videoId);
+      if (!quiz) {
+        throw new Error('Failed to generate quiz questions');
+      }
+
+      setCurrentStep('Finalizing your learning experience...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      onQuizGenerated(quiz);
     } catch (err) {
-      setError('Failed to generate quiz. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to generate quiz. Please try again.');
     } finally {
       setLoading(false);
+      setCurrentStep('');
     }
   };
 
@@ -148,33 +102,30 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
             {loading ? (
               <div className="flex items-center justify-center space-x-3">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                <span>Generating Your Quiz...</span>
+                <span>Creating Your Personalized Learning Experience...</span>
               </div>
             ) : (
               <div className="flex items-center justify-center space-x-2">
-                <span>Generate Interactive Quiz</span>
+                <span>Generate Interactive Learning Quiz</span>
                 <span className="text-xl">✨</span>
               </div>
             )}
           </button>
         </div>
 
-        {loading && (
+        {loading && currentStep && (
           <div className="mt-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6">
             <div className="text-center">
               <h3 className="text-lg font-semibold text-gray-700 mb-3">Creating Your Personalized Quiz</h3>
-              <div className="space-y-2 text-sm text-gray-600">
+              <div className="space-y-3 text-sm text-gray-600">
                 <div className="flex items-center justify-center space-x-2">
                   <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
-                  <span>Fetching video transcript...</span>
+                  <span>{currentStep}</span>
                 </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse animation-delay-200"></div>
-                  <span>Analyzing content with AI...</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse animation-delay-400"></div>
-                  <span>Generating comprehension questions...</span>
+                <div className="text-xs text-gray-500 mt-4">
+                  <p>🧠 Generating comprehension questions</p>
+                  <p>💭 Creating reflective prompts about your learning goals</p>
+                  <p>🎯 Designing application and goal-setting questions</p>
                 </div>
               </div>
             </div>

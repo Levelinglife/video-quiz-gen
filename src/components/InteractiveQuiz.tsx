@@ -1,34 +1,29 @@
 
 import { useState } from 'react';
-
-interface Question {
-  id: number;
-  questionText: string;
-  options: string[];
-  correctAnswer: string;
-}
-
-interface Quiz {
-  videoTitle: string;
-  videoUrl: string;
-  questions: Question[];
-}
+import { QuizQuestion, GeneratedQuiz } from '../services/aiService';
 
 interface InteractiveQuizProps {
-  quiz: Quiz;
+  quiz: GeneratedQuiz;
   onComplete: () => void;
 }
 
 const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
+  const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showResults, setShowResults] = useState(false);
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1;
 
   const handleAnswerSelect = (answer: string) => {
-    setSelectedAnswers(prev => ({
+    setAnswers(prev => ({
+      ...prev,
+      [currentQuestion.id]: answer
+    }));
+  };
+
+  const handleTextAnswer = (answer: string) => {
+    setAnswers(prev => ({
       ...prev,
       [currentQuestion.id]: answer
     }));
@@ -50,70 +45,133 @@ const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
 
   const calculateScore = () => {
     let correct = 0;
+    let total = 0;
+    
     quiz.questions.forEach(question => {
-      if (selectedAnswers[question.id] === question.correctAnswer) {
-        correct++;
+      if (question.type === 'multiple-choice') {
+        total++;
+        if (answers[question.id] === question.correctAnswer) {
+          correct++;
+        }
       }
     });
-    return { correct, total: quiz.questions.length, percentage: Math.round((correct / quiz.questions.length) * 100) };
+    
+    return { correct, total, percentage: total > 0 ? Math.round((correct / total) * 100) : 0 };
   };
 
-  const getEmbedUrl = (url: string) => {
-    const videoId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1];
-    return videoId ? `https://www.youtube.com/embed/${videoId}` : '';
+  const getEmbedUrl = (videoId: string) => {
+    return `https://www.youtube.com/embed/${videoId}`;
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'comprehension': return '🧠';
+      case 'reflection': return '💭';
+      case 'application': return '🎯';
+      case 'goal-setting': return '🚀';
+      default: return '❓';
+    }
+  };
+
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case 'comprehension': return 'Knowledge Check';
+      case 'reflection': return 'Personal Reflection';
+      case 'application': return 'Real-World Application';
+      case 'goal-setting': return 'Goal Setting';
+      default: return 'Question';
+    }
   };
 
   if (showResults) {
     const score = calculateScore();
+    const reflectiveAnswers = quiz.questions.filter(q => q.type === 'open-ended');
+    
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/50">
           <div className="text-center mb-8">
             <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center">
               <span className="text-3xl">🎉</span>
             </div>
-            <h2 className="text-3xl font-bold text-gray-800 mb-4">Quiz Complete!</h2>
-            <div className="text-6xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
-              {score.percentage}%
-            </div>
-            <p className="text-xl text-gray-600">
-              You scored {score.correct} out of {score.total} questions correctly
-            </p>
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">Learning Session Complete!</h2>
+            
+            {score.total > 0 && (
+              <>
+                <div className="text-6xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
+                  {score.percentage}%
+                </div>
+                <p className="text-xl text-gray-600 mb-6">
+                  You scored {score.correct} out of {score.total} knowledge questions correctly
+                </p>
+              </>
+            )}
           </div>
 
-          <div className="space-y-6 mb-8">
-            {quiz.questions.map((question, index) => {
-              const userAnswer = selectedAnswers[question.id];
-              const isCorrect = userAnswer === question.correctAnswer;
-              
-              return (
-                <div key={question.id} className={`p-6 rounded-2xl border-2 ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                  <div className="flex items-start space-x-3 mb-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`}>
-                      {isCorrect ? '✓' : '✗'}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-800 mb-2">
-                        Question {index + 1}: {question.questionText}
-                      </h3>
-                      <div className="space-y-2">
-                        <p className="text-sm">
-                          <span className="font-medium">Your answer:</span> 
-                          <span className={isCorrect ? 'text-green-700' : 'text-red-700 ml-1'}>{userAnswer}</span>
-                        </p>
-                        {!isCorrect && (
-                          <p className="text-sm">
-                            <span className="font-medium">Correct answer:</span> 
-                            <span className="text-green-700 ml-1">{question.correctAnswer}</span>
+          {/* Knowledge Questions Results */}
+          {score.total > 0 && (
+            <div className="mb-8">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">📚 Knowledge Assessment</h3>
+              <div className="space-y-4">
+                {quiz.questions
+                  .filter(q => q.type === 'multiple-choice')
+                  .map((question, index) => {
+                    const userAnswer = answers[question.id];
+                    const isCorrect = userAnswer === question.correctAnswer;
+                    
+                    return (
+                      <div key={question.id} className={`p-4 rounded-xl border-2 ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <div className="flex items-start space-x-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`}>
+                            {isCorrect ? '✓' : '✗'}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-800 mb-2">{question.questionText}</h4>
+                            <p className="text-sm">
+                              <span className="font-medium">Your answer:</span> 
+                              <span className={isCorrect ? 'text-green-700 ml-1' : 'text-red-700 ml-1'}>{userAnswer}</span>
+                            </p>
+                            {!isCorrect && (
+                              <p className="text-sm">
+                                <span className="font-medium">Correct answer:</span> 
+                                <span className="text-green-700 ml-1">{question.correctAnswer}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* Reflective Answers */}
+          {reflectiveAnswers.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">💭 Your Learning Reflections</h3>
+              <div className="space-y-6">
+                {reflectiveAnswers.map((question) => (
+                  <div key={question.id} className="p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-200">
+                    <div className="flex items-start space-x-3 mb-4">
+                      <span className="text-2xl">{getCategoryIcon(question.category)}</span>
+                      <div className="flex-1">
+                        <div className="text-sm text-purple-600 font-medium mb-1">
+                          {getCategoryLabel(question.category)}
+                        </div>
+                        <h4 className="font-semibold text-gray-800 mb-3">{question.questionText}</h4>
+                        <div className="bg-white/70 p-4 rounded-lg border">
+                          <p className="text-gray-700 whitespace-pre-wrap">
+                            {answers[question.id] || 'No response provided'}
                           </p>
-                        )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="text-center">
             <button
@@ -135,18 +193,12 @@ const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
         <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white/50">
           <h3 className="text-xl font-semibold mb-4 text-gray-800">{quiz.videoTitle}</h3>
           <div className="aspect-video rounded-2xl overflow-hidden bg-gray-100">
-            {getEmbedUrl(quiz.videoUrl) ? (
-              <iframe
-                src={getEmbedUrl(quiz.videoUrl)}
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-500">
-                <span>Video preview unavailable</span>
-              </div>
-            )}
+            <iframe
+              src={getEmbedUrl(quiz.videoId)}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
           </div>
         </div>
 
@@ -166,38 +218,60 @@ const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
             </div>
           </div>
 
+          {/* Question Category Badge */}
+          <div className="mb-4">
+            <span className="inline-flex items-center space-x-2 px-3 py-1 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 rounded-full text-sm font-medium">
+              <span>{getCategoryIcon(currentQuestion.category)}</span>
+              <span>{getCategoryLabel(currentQuestion.category)}</span>
+            </span>
+          </div>
+
           {/* Question */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">
               {currentQuestion.questionText}
             </h2>
 
-            <div className="space-y-4">
-              {currentQuestion.options.map((option, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleAnswerSelect(option)}
-                  className={`w-full p-4 text-left rounded-2xl border-2 transition-all duration-300 ${
-                    selectedAnswers[currentQuestion.id] === option
-                      ? 'border-purple-500 bg-purple-50 text-purple-700'
-                      : 'border-gray-200 bg-white hover:border-purple-300 hover:bg-purple-25'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                      selectedAnswers[currentQuestion.id] === option
-                        ? 'border-purple-500 bg-purple-500'
-                        : 'border-gray-300'
-                    }`}>
-                      {selectedAnswers[currentQuestion.id] === option && (
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                      )}
+            {currentQuestion.type === 'multiple-choice' ? (
+              <div className="space-y-4">
+                {currentQuestion.options?.map((option, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleAnswerSelect(option)}
+                    className={`w-full p-4 text-left rounded-2xl border-2 transition-all duration-300 ${
+                      answers[currentQuestion.id] === option
+                        ? 'border-purple-500 bg-purple-50 text-purple-700'
+                        : 'border-gray-200 bg-white hover:border-purple-300 hover:bg-purple-25'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                        answers[currentQuestion.id] === option
+                          ? 'border-purple-500 bg-purple-500'
+                          : 'border-gray-300'
+                      }`}>
+                        {answers[currentQuestion.id] === option && (
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                        )}
+                      </div>
+                      <span className="font-medium">{option}</span>
                     </div>
-                    <span className="font-medium">{option}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div>
+                <textarea
+                  value={answers[currentQuestion.id] || ''}
+                  onChange={(e) => handleTextAnswer(e.target.value)}
+                  placeholder={currentQuestion.placeholder}
+                  className="w-full h-32 p-4 border-2 border-gray-200 rounded-2xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none resize-none"
+                />
+                <p className="text-sm text-gray-500 mt-2">
+                  Take your time to reflect on this question. There are no wrong answers.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Navigation */}
@@ -212,10 +286,10 @@ const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
 
             <button
               onClick={handleNext}
-              disabled={!selectedAnswers[currentQuestion.id]}
+              disabled={!answers[currentQuestion.id] || (currentQuestion.type === 'open-ended' && !answers[currentQuestion.id]?.trim())}
               className="px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-2xl font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:shadow-lg"
             >
-              {isLastQuestion ? 'Finish Quiz' : 'Next Question'}
+              {isLastQuestion ? 'Complete Learning Session' : 'Next Question'}
             </button>
           </div>
         </div>
