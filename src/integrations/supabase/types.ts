@@ -9,7 +9,101 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      quiz_answers: {
+        Row: {
+          correct_answer: string | null
+          created_at: string
+          id: string
+          is_correct: boolean | null
+          question_category: string
+          question_id: number
+          question_text: string
+          question_type: string
+          session_id: string
+          user_answer: string | null
+        }
+        Insert: {
+          correct_answer?: string | null
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          question_category: string
+          question_id: number
+          question_text: string
+          question_type: string
+          session_id: string
+          user_answer?: string | null
+        }
+        Update: {
+          correct_answer?: string | null
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          question_category?: string
+          question_id?: number
+          question_text?: string
+          question_type?: string
+          session_id?: string
+          user_answer?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_answers_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_sessions: {
+        Row: {
+          channel_title: string | null
+          completed_at: string | null
+          completion_percentage: number | null
+          correct_answers: number | null
+          created_at: string
+          id: string
+          total_questions: number | null
+          transcript: string | null
+          updated_at: string
+          video_duration: string | null
+          video_id: string
+          video_thumbnail: string | null
+          video_title: string
+        }
+        Insert: {
+          channel_title?: string | null
+          completed_at?: string | null
+          completion_percentage?: number | null
+          correct_answers?: number | null
+          created_at?: string
+          id?: string
+          total_questions?: number | null
+          transcript?: string | null
+          updated_at?: string
+          video_duration?: string | null
+          video_id: string
+          video_thumbnail?: string | null
+          video_title: string
+        }
+        Update: {
+          channel_title?: string | null
+          completed_at?: string | null
+          completion_percentage?: number | null
+          correct_answers?: number | null
+          created_at?: string
+          id?: string
+          total_questions?: number | null
+          transcript?: string | null
+          updated_at?: string
+          video_duration?: string | null
+          video_id?: string
+          video_thumbnail?: string | null
+          video_title?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
