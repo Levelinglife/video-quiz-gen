@@ -1,13 +1,15 @@
 
 import { useState } from 'react';
-import { QuizQuestion, GeneratedQuiz } from '../services/aiService';
+import { Question, GeneratedQuiz } from '../services/realAiService';
+import { saveQuizAnswer, updateQuizCompletion } from '../services/quizDatabase';
 
 interface InteractiveQuizProps {
   quiz: GeneratedQuiz;
+  sessionId: string;
   onComplete: () => void;
 }
 
-const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
+const InteractiveQuiz = ({ quiz, sessionId, onComplete }: InteractiveQuizProps) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showResults, setShowResults] = useState(false);
@@ -29,8 +31,33 @@ const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
     }));
   };
 
-  const handleNext = () => {
+  const saveCurrentAnswer = async () => {
+    const userAnswer = answers[currentQuestion.id];
+    if (!userAnswer) return;
+
+    const isCorrect = currentQuestion.type === 'multiple-choice' 
+      ? userAnswer === currentQuestion.correctAnswer 
+      : undefined;
+
+    await saveQuizAnswer(
+      sessionId,
+      currentQuestion.id,
+      currentQuestion.question,
+      currentQuestion.type,
+      currentQuestion.category,
+      userAnswer,
+      currentQuestion.correctAnswer,
+      isCorrect
+    );
+  };
+
+  const handleNext = async () => {
+    await saveCurrentAnswer();
+
     if (isLastQuestion) {
+      // Calculate final score and update completion
+      const score = calculateScore();
+      await updateQuizCompletion(sessionId, score.correct, score.total);
       setShowResults(true);
     } else {
       setCurrentQuestionIndex(prev => prev + 1);
@@ -115,7 +142,7 @@ const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
               <div className="space-y-4">
                 {quiz.questions
                   .filter(q => q.type === 'multiple-choice')
-                  .map((question, index) => {
+                  .map((question) => {
                     const userAnswer = answers[question.id];
                     const isCorrect = userAnswer === question.correctAnswer;
                     
@@ -126,7 +153,7 @@ const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
                             {isCorrect ? '✓' : '✗'}
                           </div>
                           <div className="flex-1">
-                            <h4 className="font-semibold text-gray-800 mb-2">{question.questionText}</h4>
+                            <h4 className="font-semibold text-gray-800 mb-2">{question.question}</h4>
                             <p className="text-sm">
                               <span className="font-medium">Your answer:</span> 
                               <span className={isCorrect ? 'text-green-700 ml-1' : 'text-red-700 ml-1'}>{userAnswer}</span>
@@ -159,7 +186,7 @@ const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
                         <div className="text-sm text-purple-600 font-medium mb-1">
                           {getCategoryLabel(question.category)}
                         </div>
-                        <h4 className="font-semibold text-gray-800 mb-3">{question.questionText}</h4>
+                        <h4 className="font-semibold text-gray-800 mb-3">{question.question}</h4>
                         <div className="bg-white/70 p-4 rounded-lg border">
                           <p className="text-gray-700 whitespace-pre-wrap">
                             {answers[question.id] || 'No response provided'}
@@ -229,7 +256,7 @@ const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
           {/* Question */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">
-              {currentQuestion.questionText}
+              {currentQuestion.question}
             </h2>
 
             {currentQuestion.type === 'multiple-choice' ? (
@@ -264,7 +291,7 @@ const InteractiveQuiz = ({ quiz, onComplete }: InteractiveQuizProps) => {
                 <textarea
                   value={answers[currentQuestion.id] || ''}
                   onChange={(e) => handleTextAnswer(e.target.value)}
-                  placeholder={currentQuestion.placeholder}
+                  placeholder="Share your thoughts and reflections..."
                   className="w-full h-32 p-4 border-2 border-gray-200 rounded-2xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none resize-none"
                 />
                 <p className="text-sm text-gray-500 mt-2">

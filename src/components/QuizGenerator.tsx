@@ -1,10 +1,11 @@
 
 import { useState } from 'react';
 import { extractVideoId, getVideoInfo, getTranscript } from '../services/youtubeService';
-import { generateQuizFromTranscript, GeneratedQuiz } from '../services/aiService';
+import { generateQuizFromVideo, GeneratedQuiz } from '../services/realAiService';
+import { createQuizSession } from '../services/quizDatabase';
 
 interface QuizGeneratorProps {
-  onQuizGenerated: (quiz: GeneratedQuiz) => void;
+  onQuizGenerated: (quiz: GeneratedQuiz, sessionId: string) => void;
 }
 
 const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
@@ -33,12 +34,11 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
       setCurrentStep('Fetching video information...');
       const videoInfo = await getVideoInfo(videoId);
       if (!videoInfo) {
-        throw new Error('Could not fetch video information');
+        throw new Error('Could not fetch video information. The video may be private or unavailable.');
       }
 
       // Step 2: Get transcript
       setCurrentStep('Extracting video transcript...');
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate processing time
       const transcript = await getTranscript(videoId);
       if (!transcript) {
         throw new Error('Could not extract transcript from this video. The video may not have captions available.');
@@ -46,17 +46,24 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
 
       // Step 3: Generate questions with AI
       setCurrentStep('Analyzing content and generating personalized questions...');
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate AI processing time
-      const quiz = await generateQuizFromTranscript(transcript, videoInfo.title, videoId);
+      const quiz = await generateQuizFromVideo(videoId, videoInfo.title, transcript, videoInfo.description);
       if (!quiz) {
-        throw new Error('Failed to generate quiz questions');
+        throw new Error('Failed to generate quiz questions. Please try again.');
+      }
+
+      // Step 4: Save to database
+      setCurrentStep('Saving your learning session...');
+      const sessionId = await createQuizSession(quiz, videoInfo, transcript);
+      if (!sessionId) {
+        throw new Error('Failed to save quiz session. Please try again.');
       }
 
       setCurrentStep('Finalizing your learning experience...');
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      onQuizGenerated(quiz);
+      onQuizGenerated(quiz, sessionId);
     } catch (err) {
+      console.error('Quiz generation error:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate quiz. Please try again.');
     } finally {
       setLoading(false);
