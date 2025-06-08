@@ -12,10 +12,10 @@ export interface VideoInfo {
   viewCount?: string;
 }
 
-export interface TranscriptSegment {
-  text: string;
-  start: number;
-  duration: number;
+export interface TranscriptResult {
+  transcript: string;
+  source: 'captions' | 'speech-to-text';
+  suggestions?: string[];
 }
 
 export const extractVideoId = (url: string): string | null => {
@@ -50,12 +50,40 @@ export const getTranscript = async (videoId: string): Promise<string | null> => 
 
     if (error) {
       console.error('Error fetching transcript:', error);
+      
+      // Provide helpful error information to the user
+      if (error.message?.includes('No transcript available')) {
+        console.log('Transcript extraction failed - video may not have captions');
+      }
+      
       return null;
     }
 
     return data.transcript;
   } catch (error) {
     console.error('Error fetching transcript:', error);
+    return null;
+  }
+};
+
+export const getTranscriptWithDetails = async (videoId: string): Promise<TranscriptResult | null> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('youtube-transcript', {
+      body: { videoId }
+    });
+
+    if (error) {
+      console.error('Error fetching transcript:', error);
+      return null;
+    }
+
+    return {
+      transcript: data.transcript,
+      source: data.source || 'captions',
+      suggestions: data.suggestions
+    };
+  } catch (error) {
+    console.error('Error fetching transcript with details:', error);
     return null;
   }
 };

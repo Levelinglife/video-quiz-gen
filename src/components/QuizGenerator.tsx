@@ -34,21 +34,27 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
       setCurrentStep('Fetching video information...');
       const videoInfo = await getVideoInfo(videoId);
       if (!videoInfo) {
-        throw new Error('Could not fetch video information. The video may be private or unavailable.');
+        throw new Error('Could not fetch video information. The video may be private, unavailable, or the URL may be incorrect.');
       }
 
-      // Step 2: Get transcript
-      setCurrentStep('Extracting video transcript...');
+      // Step 2: Get transcript with improved error handling
+      setCurrentStep('Extracting video transcript and captions...');
       const transcript = await getTranscript(videoId);
       if (!transcript) {
-        throw new Error('Could not extract transcript from this video. The video may not have captions available.');
+        throw new Error(`Could not extract transcript from this video. This could be because:
+        • The video doesn't have captions or subtitles
+        • The video is in a language that isn't supported
+        • The video is too short or doesn't contain speech
+        • The video may be music-only or have background music that interferes with speech recognition
+        
+        Try using a video that has captions available or clear speech content.`);
       }
 
       // Step 3: Generate questions with AI
       setCurrentStep('Analyzing content and generating personalized questions...');
       const quiz = await generateQuizFromVideo(videoId, videoInfo.title, transcript, videoInfo.description);
       if (!quiz) {
-        throw new Error('Failed to generate quiz questions. Please try again.');
+        throw new Error('Failed to generate quiz questions. The video content may not be suitable for quiz generation. Please try a different video with educational content.');
       }
 
       // Step 4: Save to database
@@ -93,11 +99,20 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
                 <span className="text-2xl">🎬</span>
               </div>
             </div>
+            <p className="text-sm text-gray-500 mt-2">
+              💡 Tip: Works best with educational videos that have clear speech and captions
+            </p>
           </div>
 
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <p className="text-red-600 font-medium">{error}</p>
+              <div className="flex items-start space-x-3">
+                <span className="text-red-500 text-xl">⚠️</span>
+                <div>
+                  <p className="text-red-600 font-medium mb-2">Unable to process this video</p>
+                  <div className="text-red-600 text-sm whitespace-pre-line">{error}</div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -130,9 +145,10 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
                   <span>{currentStep}</span>
                 </div>
                 <div className="text-xs text-gray-500 mt-4">
+                  <p>🎯 Extracting captions and speech content</p>
                   <p>🧠 Generating comprehension questions</p>
                   <p>💭 Creating reflective prompts about your learning goals</p>
-                  <p>🎯 Designing application and goal-setting questions</p>
+                  <p>📈 Designing application and goal-setting questions</p>
                 </div>
               </div>
             </div>
