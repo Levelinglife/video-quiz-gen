@@ -4,25 +4,34 @@ import Header from '../components/Header';
 import QuizGenerator from '../components/QuizGenerator';
 import Dashboard from '../components/Dashboard';
 import InteractiveQuiz from '../components/InteractiveQuiz';
-import { GeneratedQuiz } from '../services/aiService';
+import { GeneratedQuiz } from '../services/realAiService';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'quiz'>('home');
   const [currentQuiz, setCurrentQuiz] = useState<GeneratedQuiz | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
-  const handleQuizGenerated = (quiz: GeneratedQuiz) => {
+  const handleQuizGenerated = (quiz: GeneratedQuiz, sessionId: string) => {
     setCurrentQuiz(quiz);
+    setCurrentSessionId(sessionId);
     setCurrentView('quiz');
   };
 
   const handleQuizComplete = () => {
     setCurrentView('dashboard');
     setCurrentQuiz(null);
+    setCurrentSessionId(null);
+  };
+
+  const handleBackToGenerator = () => {
+    setCurrentView('home');
+    setCurrentQuiz(null);
+    setCurrentSessionId(null);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
-      <Header currentView={currentView} setCurrentView={setCurrentView} />
+      <Header onBackToGenerator={handleBackToGenerator} />
       
       <main className="container mx-auto px-4 py-8">
         {currentView === 'home' && (
@@ -68,10 +77,14 @@ const Index = () => {
           </div>
         )}
 
-        {currentView === 'dashboard' && <Dashboard />}
+        {currentView === 'dashboard' && <Dashboard onBackToGenerator={handleBackToGenerator} />}
         
-        {currentView === 'quiz' && currentQuiz && (
-          <InteractiveQuiz quiz={currentQuiz} onComplete={handleQuizComplete} />
+        {currentView === 'quiz' && currentQuiz && currentSessionId && (
+          <InteractiveQuiz 
+            quiz={currentQuiz} 
+            sessionId={currentSessionId}
+            onComplete={handleQuizComplete} 
+          />
         )}
       </main>
     </div>

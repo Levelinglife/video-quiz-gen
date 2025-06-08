@@ -2,11 +2,10 @@
 import { useState } from 'react';
 
 interface HeaderProps {
-  currentView: 'home' | 'dashboard' | 'quiz';
-  setCurrentView: (view: 'home' | 'dashboard' | 'quiz') => void;
+  onBackToGenerator: () => void;
 }
 
-const Header = ({ currentView, setCurrentView }: HeaderProps) => {
+const Header = ({ onBackToGenerator }: HeaderProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -16,7 +15,7 @@ const Header = ({ currentView, setCurrentView }: HeaderProps) => {
           {/* Logo */}
           <div 
             className="flex items-center space-x-2 cursor-pointer group"
-            onClick={() => setCurrentView('home')}
+            onClick={onBackToGenerator}
           >
             <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
               <span className="text-white font-bold text-lg">V</span>
@@ -29,24 +28,10 @@ const Header = ({ currentView, setCurrentView }: HeaderProps) => {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             <button
-              onClick={() => setCurrentView('home')}
-              className={`px-4 py-2 rounded-lg transition-all font-medium ${
-                currentView === 'home'
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'
-              }`}
+              onClick={onBackToGenerator}
+              className="px-4 py-2 rounded-lg transition-all font-medium text-gray-600 hover:text-purple-600 hover:bg-purple-50"
             >
               New Lesson
-            </button>
-            <button
-              onClick={() => setCurrentView('dashboard')}
-              className={`px-4 py-2 rounded-lg transition-all font-medium ${
-                currentView === 'dashboard'
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'
-              }`}
-            >
-              Dashboard
             </button>
             <div className="w-8 h-8 bg-gradient-to-r from-purple-400 to-blue-400 rounded-full cursor-pointer hover:scale-105 transition-transform"></div>
           </nav>
@@ -70,29 +55,12 @@ const Header = ({ currentView, setCurrentView }: HeaderProps) => {
             <div className="flex flex-col space-y-2 pt-4">
               <button
                 onClick={() => {
-                  setCurrentView('home');
+                  onBackToGenerator();
                   setIsMenuOpen(false);
                 }}
-                className={`px-4 py-2 rounded-lg transition-all font-medium text-left ${
-                  currentView === 'home'
-                    ? 'bg-purple-100 text-purple-700'
-                    : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'
-                }`}
+                className="px-4 py-2 rounded-lg transition-all font-medium text-left text-gray-600 hover:text-purple-600 hover:bg-purple-50"
               >
                 New Lesson
-              </button>
-              <button
-                onClick={() => {
-                  setCurrentView('dashboard');
-                  setIsMenuOpen(false);
-                }}
-                className={`px-4 py-2 rounded-lg transition-all font-medium text-left ${
-                  currentView === 'dashboard'
-                    ? 'bg-purple-100 text-purple-700'
-                    : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'
-                }`}
-              >
-                Dashboard
               </button>
             </div>
           </nav>
