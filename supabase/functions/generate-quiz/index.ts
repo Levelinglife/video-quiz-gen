@@ -14,10 +14,10 @@ serve(async (req) => {
 
   try {
     const { videoTitle, transcript, videoDescription } = await req.json();
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
 
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
+    if (!googleApiKey) {
+      throw new Error('Google API key not configured');
     }
 
     const prompt = `Based on the YouTube video titled "${videoTitle}" with the following transcript and description, generate a comprehensive learning quiz with exactly 8 questions.
@@ -56,40 +56,50 @@ Requirements:
 - Questions should be based on the actual content from the transcript
 - Focus on key concepts, practical applications, and personal growth opportunities`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${googleApiKey}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert educational content creator. Generate high-quality learning questions that help users deeply understand and apply video content. Always return valid JSON only.'
-          },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000,
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        }
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Google Gemini API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    const generatedContent = data.choices[0].message.content;
+    
+    if (!data.candidates || data.candidates.length === 0) {
+      throw new Error('No response generated from Gemini API');
+    }
+
+    const generatedContent = data.candidates[0].content.parts[0].text;
     
     try {
-      const quiz = JSON.parse(generatedContent);
+      // Clean the response to extract JSON (Gemini sometimes adds markdown formatting)
+      const jsonMatch = generatedContent.match(/\{[\s\S]*\}/);
+      const cleanedContent = jsonMatch ? jsonMatch[0] : generatedContent;
+      
+      const quiz = JSON.parse(cleanedContent);
       return new Response(JSON.stringify(quiz), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } catch (parseError) {
-      console.error('Failed to parse OpenAI response as JSON:', generatedContent);
+      console.error('Failed to parse Gemini response as JSON:', generatedContent);
       throw new Error('Failed to generate valid quiz format');
     }
 
