@@ -61,11 +61,16 @@ async function getYouTubeTranscript(videoId: string): Promise<string | null> {
     // Get the YouTube watch page HTML with proper headers
     const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0'
       }
     });
     
@@ -77,26 +82,69 @@ async function getYouTubeTranscript(videoId: string): Promise<string | null> {
     const html = await response.text();
     console.log('Fetched YouTube page HTML, length:', html.length);
 
-    // Try multiple regex patterns to find captions data
+    // Enhanced regex patterns to find captions data in different formats
     const captionsPatterns = [
-      /"captions":(\{.*?\}),"videoDetails"/s,
-      /"playerCaptionsTracklistRenderer":(\{.*?\}),"audioTracks"/s,
-      /"captionTracks":(\[.*?\]),"audioTracks"/s,
-      /"captions":(\{.*?\}),"/s
+      // Standard captions format
+      /"captions":(\{[^}]*"playerCaptionsTracklistRenderer":\{[^}]*"captionTracks":\[[^\]]*\][^}]*\}[^}]*\})/,
+      // Alternative format 1
+      /"playerCaptionsTracklistRenderer":(\{[^}]*"captionTracks":\[[^\]]*\][^}]*\})/,
+      // Alternative format 2
+      /"captionTracks":(\[[^\]]*\])/,
+      // Embedded format
+      /ytInitialPlayerResponse[^{]*(\{[^{]*"captions"[^}]*"playerCaptionsTracklistRenderer"[^}]*\})/,
+      // Script tag format
+      /var ytInitialPlayerResponse = (\{.*?"captions".*?\});/s,
+      // Window format
+      /window\["ytInitialPlayerResponse"\] = (\{.*?"captions".*?\});/s
     ];
 
     let captionsData = null;
+    let rawCaptionsText = null;
     
-    for (const pattern of captionsPatterns) {
+    for (let i = 0; i < captionsPatterns.length; i++) {
+      const pattern = captionsPatterns[i];
       const match = html.match(pattern);
       if (match) {
         try {
-          captionsData = JSON.parse(match[1]);
-          console.log('Found captions data with pattern:', pattern.source);
-          break;
+          rawCaptionsText = match[1];
+          console.log(`Found potential captions data with pattern ${i + 1}, length: ${rawCaptionsText.length}`);
+          
+          // Try to parse as JSON
+          if (rawCaptionsText.startsWith('{')) {
+            captionsData = JSON.parse(rawCaptionsText);
+          } else if (rawCaptionsText.startsWith('[')) {
+            captionsData = { captionTracks: JSON.parse(rawCaptionsText) };
+          }
+          
+          if (captionsData) {
+            console.log('Successfully parsed captions data');
+            break;
+          }
         } catch (e) {
-          console.log('Failed to parse captions data:', e);
+          console.log(`Failed to parse captions data from pattern ${i + 1}:`, e.message);
           continue;
+        }
+      }
+    }
+
+    // If no JSON data found, try to find ytInitialPlayerResponse in a script tag
+    if (!captionsData) {
+      console.log('Trying to extract ytInitialPlayerResponse from script tags');
+      const scriptMatches = html.match(/<script[^>]*>.*?var ytInitialPlayerResponse = (\{.*?\});.*?<\/script>/gs);
+      
+      for (const scriptMatch of scriptMatches || []) {
+        const dataMatch = scriptMatch.match(/var ytInitialPlayerResponse = (\{.*?\});/s);
+        if (dataMatch) {
+          try {
+            const playerResponse = JSON.parse(dataMatch[1]);
+            if (playerResponse.captions) {
+              captionsData = playerResponse.captions;
+              console.log('Found captions in ytInitialPlayerResponse');
+              break;
+            }
+          } catch (e) {
+            console.log('Failed to parse ytInitialPlayerResponse:', e.message);
+          }
         }
       }
     }
@@ -138,11 +186,29 @@ async function getYouTubeTranscript(videoId: string): Promise<string | null> {
 
     console.log('Selected caption track:', selectedTrack.languageCode, selectedTrack.name?.simpleText);
 
-    // Fetch the caption content
-    const captionResponse = await fetch(selectedTrack.baseUrl);
+    // Fetch the caption content with retry logic
+    let captionResponse;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        captionResponse = await fetch(selectedTrack.baseUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        
+        if (captionResponse.ok) break;
+        
+        console.log(`Caption fetch attempt ${attempt + 1} failed: ${captionResponse.status}`);
+        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1000));
+        
+      } catch (e) {
+        console.log(`Caption fetch attempt ${attempt + 1} error:`, e.message);
+        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
     
-    if (!captionResponse.ok) {
-      console.log('Failed to fetch caption content');
+    if (!captionResponse || !captionResponse.ok) {
+      console.log('Failed to fetch caption content after retries');
       return null;
     }
     
