@@ -21,29 +21,29 @@ serve(async (req) => {
 
     console.log(`Starting transcript extraction for video: ${videoId}`);
 
-    // Try multiple extraction methods with detailed logging
+    // Try the direct caption tracks API approach first
     let transcript = null;
     let extractionMethod = '';
 
-    // Method 1: Enhanced YouTube page parsing
+    // Method 1: Try YouTube's internal API for captions
     try {
-      console.log('Method 1: Trying enhanced YouTube page parsing...');
-      transcript = await getYouTubeTranscriptEnhanced(videoId);
+      console.log('Method 1: Trying YouTube internal caption API...');
+      transcript = await getYouTubeTranscriptAPI(videoId);
       if (transcript) {
-        extractionMethod = 'enhanced-page-parsing';
+        extractionMethod = 'youtube-api';
         console.log('Method 1 succeeded');
       }
     } catch (error) {
       console.log('Method 1 failed:', error.message);
     }
 
-    // Method 2: Alternative page format parsing
+    // Method 2: Enhanced page parsing with debug info
     if (!transcript) {
       try {
-        console.log('Method 2: Trying alternative page format parsing...');
-        transcript = await getYouTubeTranscriptAlternative(videoId);
+        console.log('Method 2: Trying enhanced page parsing with debug...');
+        transcript = await getYouTubeTranscriptEnhanced(videoId);
         if (transcript) {
-          extractionMethod = 'alternative-parsing';
+          extractionMethod = 'enhanced-page-parsing';
           console.log('Method 2 succeeded');
         }
       } catch (error) {
@@ -51,13 +51,13 @@ serve(async (req) => {
       }
     }
 
-    // Method 3: Embedded page parsing
+    // Method 3: Try different URL formats
     if (!transcript) {
       try {
-        console.log('Method 3: Trying embedded page parsing...');
-        transcript = await getYouTubeTranscriptEmbedded(videoId);
+        console.log('Method 3: Trying different URL formats...');
+        transcript = await getYouTubeTranscriptAlternativeURLs(videoId);
         if (transcript) {
-          extractionMethod = 'embedded-parsing';
+          extractionMethod = 'alternative-urls';
           console.log('Method 3 succeeded');
         }
       } catch (error) {
@@ -66,22 +66,15 @@ serve(async (req) => {
     }
 
     if (!transcript) {
-      console.log('All extraction methods failed, attempting Speech-to-Text fallback');
-      transcript = await getSpeechToTextTranscript(videoId);
-      if (transcript) {
-        extractionMethod = 'speech-to-text';
-      }
-    }
-
-    if (!transcript) {
-      throw new Error('No transcript available for this video. The video may not have captions and all extraction methods failed.');
+      console.log('All extraction methods failed');
+      throw new Error('Unable to extract transcript. The video may not have accessible captions, or YouTube has changed their page structure. Please try a different video with clear captions.');
     }
 
     console.log(`Successfully extracted transcript using ${extractionMethod}, length: ${transcript.length}`);
 
     return new Response(JSON.stringify({
       transcript: transcript,
-      source: extractionMethod.includes('speech') ? 'speech-to-text' : 'captions',
+      source: 'captions',
       extractionMethod: extractionMethod
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -95,7 +88,7 @@ serve(async (req) => {
         'Make sure the video has captions available',
         'Try a different video with clear speech content',
         'Check if the video is public and accessible',
-        'Ensure the video URL is correct and complete'
+        'Some videos may have caption access restrictions'
       ]
     }), {
       status: 500,
@@ -104,17 +97,69 @@ serve(async (req) => {
   }
 });
 
+async function getYouTubeTranscriptAPI(videoId: string): Promise<string | null> {
+  try {
+    console.log('API method: Attempting direct caption track access...');
+    
+    // Try to get caption tracks directly from YouTube's API endpoint
+    const captionListUrl = `https://www.youtube.com/api/timedtext?type=list&v=${videoId}`;
+    
+    const response = await fetch(captionListUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Caption list API failed: ${response.status}`);
+    }
+    
+    const xmlText = await response.text();
+    console.log(`API method: Got caption list XML, length: ${xmlText.length}`);
+    
+    // Parse the XML to find available caption tracks
+    const langCodeMatch = xmlText.match(/lang_code="([^"]+)"/);
+    if (!langCodeMatch) {
+      throw new Error('No caption tracks found in API response');
+    }
+    
+    const langCode = langCodeMatch[1];
+    console.log(`API method: Found language code: ${langCode}`);
+    
+    // Get the actual captions
+    const captionUrl = `https://www.youtube.com/api/timedtext?lang=${langCode}&v=${videoId}&fmt=srv3`;
+    const captionResponse = await fetch(captionUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    if (!captionResponse.ok) {
+      throw new Error(`Caption content API failed: ${captionResponse.status}`);
+    }
+    
+    const captionXml = await captionResponse.text();
+    return parseCaptionXML(captionXml);
+    
+  } catch (error) {
+    console.error('API method error:', error);
+    return null;
+  }
+}
+
 async function getYouTubeTranscriptEnhanced(videoId: string): Promise<string | null> {
   try {
-    console.log('Enhanced method: Fetching YouTube page...');
+    console.log('Enhanced method: Fetching YouTube page with detailed debugging...');
     
     const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        'Accept-Encoding': 'gzip, deflate',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
       }
     });
     
@@ -125,247 +170,212 @@ async function getYouTubeTranscriptEnhanced(videoId: string): Promise<string | n
     const html = await response.text();
     console.log(`Enhanced method: Fetched HTML, length: ${html.length}`);
 
-    // Try multiple extraction patterns with more comprehensive regex
+    // Log HTML snippets to see what we're working with
+    const captionSearchTerms = ['captions', 'playerCaptionsTracklistRenderer', 'captionTracks'];
+    for (const term of captionSearchTerms) {
+      const index = html.indexOf(term);
+      if (index !== -1) {
+        const snippet = html.substring(Math.max(0, index - 100), index + 500);
+        console.log(`Found "${term}" at position ${index}, snippet: ${snippet.substring(0, 200)}...`);
+      } else {
+        console.log(`Term "${term}" not found in HTML`);
+      }
+    }
+
+    // Try multiple comprehensive extraction patterns
     const extractionPatterns = [
-      // Pattern 1: Full ytInitialPlayerResponse
-      /var ytInitialPlayerResponse = (\{.*?"captions".*?\});/s,
-      /window\["ytInitialPlayerResponse"\] = (\{.*?"captions".*?\});/s,
+      // Standard ytInitialPlayerResponse patterns
+      /var ytInitialPlayerResponse\s*=\s*(\{.*?\});var/s,
+      /window\["ytInitialPlayerResponse"\]\s*=\s*(\{.*?\});/s,
+      /ytInitialPlayerResponse\s*=\s*(\{[^;]+\});/s,
       
-      // Pattern 2: Captions section only
-      /"captions":(\{.*?"playerCaptionsTracklistRenderer".*?\})/s,
-      /"playerCaptionsTracklistRenderer":(\{.*?"captionTracks".*?\})/s,
+      // Embedded in script tags
+      /<script[^>]*>var ytInitialPlayerResponse = (\{.*?\});<\/script>/s,
+      /<script[^>]*>window\["ytInitialPlayerResponse"\] = (\{.*?\});<\/script>/s,
       
-      // Pattern 3: Caption tracks array
-      /"captionTracks":(\[.*?\])/s,
+      // Direct captions object search
+      /"captions":\s*(\{[^}]*"playerCaptionsTracklistRenderer"[^}]*\})/s,
+      /"playerCaptionsTracklistRenderer":\s*(\{[^}]*"captionTracks"[^}]*\})/s,
       
-      // Pattern 4: Alternative formats
-      /ytInitialPlayerResponse["']?\s*[:=]\s*(\{[^;]*"captions"[^;]*\})/s,
-      /"captions":\s*(\{[^}]*"playerCaptionsTracklistRenderer"[^}]*\})/s
+      // More specific patterns
+      /ytInitialPlayerResponse"\]\s*=\s*(\{[^<]*captions[^<]*\})/s,
+      /ytInitialPlayerResponse\s*=\s*(\{[^<]*captions[^<]*\})/s,
     ];
 
     let captionsData = null;
     let matchedPattern = -1;
 
     for (let i = 0; i < extractionPatterns.length; i++) {
+      console.log(`Testing extraction pattern ${i + 1}...`);
       const pattern = extractionPatterns[i];
       const match = html.match(pattern);
       
       if (match && match[1]) {
+        console.log(`Pattern ${i + 1} matched, trying to parse JSON...`);
         try {
-          console.log(`Enhanced method: Found match with pattern ${i + 1}`);
-          const jsonStr = match[1];
+          let jsonStr = match[1];
           
-          // Clean up the JSON string
-          const cleanJson = jsonStr
-            .replace(/,\s*}/g, '}')
-            .replace(/,\s*]/g, ']')
-            .trim();
+          // Clean up JSON string
+          jsonStr = jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
           
-          if (cleanJson.startsWith('{')) {
-            captionsData = JSON.parse(cleanJson);
+          // Try to find where the JSON object ends
+          let braceCount = 0;
+          let endIndex = 0;
+          for (let j = 0; j < jsonStr.length; j++) {
+            if (jsonStr[j] === '{') braceCount++;
+            if (jsonStr[j] === '}') braceCount--;
+            if (braceCount === 0) {
+              endIndex = j + 1;
+              break;
+            }
+          }
+          
+          if (endIndex > 0) {
+            jsonStr = jsonStr.substring(0, endIndex);
+          }
+          
+          console.log(`Attempting to parse JSON of length: ${jsonStr.length}`);
+          const parsed = JSON.parse(jsonStr);
+          
+          // Look for captions in the parsed object
+          if (parsed.captions || (parsed.playerResponse && parsed.playerResponse.captions)) {
+            captionsData = parsed;
             matchedPattern = i + 1;
-            console.log(`Enhanced method: Successfully parsed JSON from pattern ${i + 1}`);
+            console.log(`Successfully parsed JSON from pattern ${i + 1} and found captions`);
             break;
-          } else if (cleanJson.startsWith('[')) {
-            captionsData = { captionTracks: JSON.parse(cleanJson) };
-            matchedPattern = i + 1;
-            console.log(`Enhanced method: Successfully parsed array from pattern ${i + 1}`);
-            break;
+          } else {
+            console.log(`Pattern ${i + 1} parsed successfully but no captions found`);
           }
         } catch (parseError) {
-          console.log(`Enhanced method: Failed to parse JSON from pattern ${i + 1}:`, parseError.message);
-          continue;
+          console.log(`Pattern ${i + 1} JSON parse failed:`, parseError.message);
         }
+      } else {
+        console.log(`Pattern ${i + 1} did not match`);
       }
     }
 
     if (!captionsData) {
-      console.log('Enhanced method: No captions data found in any pattern');
-      return null;
+      console.log('No captions data found in any pattern, trying raw search...');
+      
+      // Try to find caption tracks directly in the HTML
+      const directCaptionSearch = /"captionTracks":\s*(\[[^\]]+\])/;
+      const directMatch = html.match(directCaptionSearch);
+      if (directMatch) {
+        try {
+          const tracks = JSON.parse(directMatch[1]);
+          if (tracks.length > 0) {
+            console.log(`Found ${tracks.length} caption tracks via direct search`);
+            const selectedTrack = tracks.find((track: any) => 
+              track.languageCode?.startsWith('en')
+            ) || tracks[0];
+            
+            if (selectedTrack?.baseUrl) {
+              return await fetchCaptionContent(selectedTrack.baseUrl);
+            }
+          }
+        } catch (e) {
+          console.log('Direct caption search parse failed:', e.message);
+        }
+      }
+      
+      throw new Error('No captions data found in page HTML');
     }
 
-    console.log(`Enhanced method: Found captions data using pattern ${matchedPattern}`);
-
-    // Extract caption tracks with multiple fallback paths
+    // Extract caption tracks from the found data
     let captionTracks = null;
     
     if (captionsData.captions?.playerCaptionsTracklistRenderer?.captionTracks) {
       captionTracks = captionsData.captions.playerCaptionsTracklistRenderer.captionTracks;
+    } else if (captionsData.playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks) {
+      captionTracks = captionsData.playerResponse.captions.playerCaptionsTracklistRenderer.captionTracks;
     } else if (captionsData.playerCaptionsTracklistRenderer?.captionTracks) {
       captionTracks = captionsData.playerCaptionsTracklistRenderer.captionTracks;
-    } else if (captionsData.captionTracks) {
-      captionTracks = captionsData.captionTracks;
-    } else if (Array.isArray(captionsData)) {
-      captionTracks = captionsData;
     }
 
-    if (!captionTracks || captionTracks.length === 0) {
-      console.log('Enhanced method: No caption tracks found in data structure');
-      return null;
+    if (!captionTracks || !Array.isArray(captionTracks) || captionTracks.length === 0) {
+      throw new Error('No caption tracks found in extracted data');
     }
 
-    console.log(`Enhanced method: Found ${captionTracks.length} caption tracks`);
+    console.log(`Found ${captionTracks.length} caption tracks`);
 
-    // Smart track selection with preference for English and manual captions
-    let selectedTrack = null;
-    
-    // First, try to find manual English captions
-    selectedTrack = captionTracks.find((track: any) => 
-      (track.languageCode === 'en' || track.languageCode === 'en-US' || track.languageCode === 'en-GB') &&
-      track.kind !== 'asr'
-    );
-
-    // If not found, try any English captions
-    if (!selectedTrack) {
-      selectedTrack = captionTracks.find((track: any) => 
-        track.languageCode === 'en' || track.languageCode === 'en-US' || track.languageCode === 'en-GB'
-      );
-    }
-
-    // If still not found, try any manual captions
-    if (!selectedTrack) {
-      selectedTrack = captionTracks.find((track: any) => track.kind !== 'asr');
-    }
-
-    // Last resort: use any available track
-    if (!selectedTrack) {
-      selectedTrack = captionTracks[0];
-    }
+    // Select the best track
+    let selectedTrack = captionTracks.find((track: any) => 
+      track.languageCode === 'en' && track.kind !== 'asr'
+    ) || captionTracks.find((track: any) => 
+      track.languageCode?.startsWith('en')
+    ) || captionTracks[0];
 
     if (!selectedTrack?.baseUrl) {
-      console.log('Enhanced method: No valid caption URL found');
-      return null;
+      throw new Error('No valid caption URL found in tracks');
     }
 
-    console.log('Enhanced method: Selected track:', {
+    console.log('Selected track:', {
       language: selectedTrack.languageCode,
-      name: selectedTrack.name?.simpleText || selectedTrack.name?.runs?.[0]?.text,
-      kind: selectedTrack.kind || 'manual'
+      kind: selectedTrack.kind,
+      name: selectedTrack.name?.simpleText || 'Unknown'
     });
 
     return await fetchCaptionContent(selectedTrack.baseUrl);
 
   } catch (error) {
     console.error('Enhanced method error:', error);
-    return null;
+    throw error;
   }
 }
 
-async function getYouTubeTranscriptAlternative(videoId: string): Promise<string | null> {
-  try {
-    console.log('Alternative method: Trying different YouTube URL format...');
-    
-    // Try with different parameters and headers
-    const response = await fetch(`https://www.youtube.com/watch?v=${videoId}&has_verified=1&bpctr=9999999999`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'X-YouTube-Client-Name': '1',
-        'X-YouTube-Client-Version': '2.20231201.00.00'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Alternative method HTTP error: ${response.status}`);
-    }
+async function getYouTubeTranscriptAlternativeURLs(videoId: string): Promise<string | null> {
+  const urlVariants = [
+    `https://www.youtube.com/watch?v=${videoId}&hl=en`,
+    `https://www.youtube.com/watch?v=${videoId}&cc_load_policy=1`,
+    `https://www.youtube.com/embed/${videoId}?cc_load_policy=1`,
+    `https://m.youtube.com/watch?v=${videoId}`,
+  ];
 
-    const html = await response.text();
-    console.log(`Alternative method: Fetched HTML, length: ${html.length}`);
-
-    // Look for different script patterns
-    const scriptPatterns = [
-      /<script[^>]*>\s*var ytInitialPlayerResponse\s*=\s*(\{.*?\});\s*<\/script>/gs,
-      /<script[^>]*>\s*window\.ytInitialPlayerResponse\s*=\s*(\{.*?\});\s*<\/script>/gs,
-      /ytInitialPlayerResponse["']?\s*[:=]\s*(\{[^<]*\})/gs
-    ];
-
-    for (const pattern of scriptPatterns) {
-      const matches = html.matchAll(pattern);
-      for (const match of matches) {
-        try {
-          const playerResponse = JSON.parse(match[1]);
-          if (playerResponse.captions?.playerCaptionsTracklistRenderer?.captionTracks) {
-            console.log('Alternative method: Found captions in player response');
-            const tracks = playerResponse.captions.playerCaptionsTracklistRenderer.captionTracks;
+  for (const url of urlVariants) {
+    try {
+      console.log(`Trying URL variant: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+        }
+      });
+      
+      if (!response.ok) continue;
+      
+      const html = await response.text();
+      console.log(`Fetched HTML from ${url}, length: ${html.length}`);
+      
+      // Quick check for captions
+      if (html.includes('captionTracks')) {
+        const match = html.match(/"captionTracks":\s*(\[[^\]]+\])/);
+        if (match) {
+          try {
+            const tracks = JSON.parse(match[1]);
             const track = tracks.find((t: any) => t.languageCode?.startsWith('en')) || tracks[0];
             if (track?.baseUrl) {
+              console.log(`Found captions in ${url}`);
               return await fetchCaptionContent(track.baseUrl);
             }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-    }
-
-    console.log('Alternative method: No captions found');
-    return null;
-
-  } catch (error) {
-    console.error('Alternative method error:', error);
-    return null;
-  }
-}
-
-async function getYouTubeTranscriptEmbedded(videoId: string): Promise<string | null> {
-  try {
-    console.log('Embedded method: Trying embedded video page...');
-    
-    const response = await fetch(`https://www.youtube.com/embed/${videoId}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://www.youtube.com/'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Embedded method HTTP error: ${response.status}`);
-    }
-
-    const html = await response.text();
-    console.log(`Embedded method: Fetched HTML, length: ${html.length}`);
-
-    // Look for embedded player response
-    const embedPattern = /"playerResponse":"(\{.*?\})"/s;
-    const match = html.match(embedPattern);
-    
-    if (match) {
-      try {
-        // Decode the escaped JSON
-        const decodedJson = match[1]
-          .replace(/\\"/g, '"')
-          .replace(/\\\\/g, '\\');
-        
-        const playerResponse = JSON.parse(decodedJson);
-        
-        if (playerResponse.captions?.playerCaptionsTracklistRenderer?.captionTracks) {
-          console.log('Embedded method: Found captions');
-          const tracks = playerResponse.captions.playerCaptionsTracklistRenderer.captionTracks;
-          const track = tracks.find((t: any) => t.languageCode?.startsWith('en')) || tracks[0];
-          if (track?.baseUrl) {
-            return await fetchCaptionContent(track.baseUrl);
+          } catch (e) {
+            continue;
           }
         }
-      } catch (parseError) {
-        console.log('Embedded method: JSON parse error:', parseError.message);
       }
+    } catch (error) {
+      console.log(`URL variant ${url} failed:`, error.message);
+      continue;
     }
-
-    console.log('Embedded method: No captions found');
-    return null;
-
-  } catch (error) {
-    console.error('Embedded method error:', error);
-    return null;
   }
+  
+  return null;
 }
 
 async function fetchCaptionContent(captionUrl: string): Promise<string | null> {
   try {
     console.log('Fetching caption content from:', captionUrl);
     
-    // Add format parameter to get plain text if possible
     const url = new URL(captionUrl);
     url.searchParams.set('fmt', 'srv3');
     
@@ -381,8 +391,17 @@ async function fetchCaptionContent(captionUrl: string): Promise<string | null> {
     
     const captionXml = await response.text();
     console.log(`Fetched caption XML, length: ${captionXml.length}`);
+    
+    return parseCaptionXML(captionXml);
 
-    // Enhanced XML parsing with multiple patterns
+  } catch (error) {
+    console.error('Error fetching caption content:', error);
+    return null;
+  }
+}
+
+function parseCaptionXML(captionXml: string): string | null {
+  try {
     const textPatterns = [
       /<text[^>]*>(.*?)<\/text>/gs,
       /<p[^>]*>(.*?)<\/p>/gs,
@@ -415,35 +434,17 @@ async function fetchCaptionContent(captionUrl: string): Promise<string | null> {
     }
 
     if (textSegments.length === 0) {
-      console.log('No text segments found in caption content');
+      console.log('No text segments found in caption XML');
       return null;
     }
 
     const transcript = textSegments.join(' ');
-    console.log(`Extracted transcript with ${textSegments.length} segments, total length: ${transcript.length}`);
+    console.log(`Parsed transcript with ${textSegments.length} segments, total length: ${transcript.length}`);
     
     return transcript;
 
   } catch (error) {
-    console.error('Error fetching caption content:', error);
-    return null;
-  }
-}
-
-async function getSpeechToTextTranscript(videoId: string): Promise<string | null> {
-  try {
-    const googleCloudKey = Deno.env.get('GOOGLE_CLOUD_API_KEY');
-    
-    if (!googleCloudKey) {
-      console.log('Google Cloud API key not configured, skipping Speech-to-Text fallback');
-      return null;
-    }
-
-    console.log('Speech-to-Text fallback not fully implemented yet');
-    return '[Auto-generated] Speech-to-text transcription would be generated here for videos without captions.';
-
-  } catch (error) {
-    console.error('Error with Speech-to-Text fallback:', error);
+    console.error('Error parsing caption XML:', error);
     return null;
   }
 }
