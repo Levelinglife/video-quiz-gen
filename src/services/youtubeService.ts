@@ -44,24 +44,34 @@ export const getVideoInfo = async (videoId: string): Promise<VideoInfo | null> =
 
 export const getTranscript = async (videoId: string): Promise<string | null> => {
   try {
+    console.log(`Attempting to get transcript for video: ${videoId}`);
+    
     const { data, error } = await supabase.functions.invoke('youtube-transcript', {
       body: { videoId }
     });
 
     if (error) {
-      console.error('Error fetching transcript:', error);
+      console.error('Transcript extraction error:', error);
       
-      // Provide helpful error information to the user
-      if (error.message?.includes('No transcript available')) {
-        console.log('Transcript extraction failed - video may not have captions');
+      // Check for specific error types
+      if (error.message?.includes('No captions found')) {
+        console.log('Video does not have accessible captions');
+        return null;
       }
       
       return null;
     }
 
-    return data.transcript;
+    if (data?.transcript && data.transcript.length > 50) {
+      console.log(`Successfully extracted transcript, length: ${data.transcript.length}`);
+      return data.transcript;
+    } else {
+      console.log('Transcript too short or empty');
+      return null;
+    }
+    
   } catch (error) {
-    console.error('Error fetching transcript:', error);
+    console.error('Error in getTranscript:', error);
     return null;
   }
 };
@@ -73,7 +83,7 @@ export const getTranscriptWithDetails = async (videoId: string): Promise<Transcr
     });
 
     if (error) {
-      console.error('Error fetching transcript:', error);
+      console.error('Error fetching transcript with details:', error);
       return null;
     }
 
