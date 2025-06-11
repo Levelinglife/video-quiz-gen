@@ -1,1 +1,14 @@
+
 project_id = "vpdbonqiakdfjybooemw"
+
+[functions.youtube-transcript]
+verify_jwt = false
+
+[functions.youtube-metadata]
+verify_jwt = false
+
+[functions.generate-quiz]
+verify_jwt = false
+
+[functions.speech-to-text]
+verify_jwt = false

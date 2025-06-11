@@ -26,19 +26,25 @@ export const extractVideoId = (url: string): string | null => {
 
 export const getVideoInfo = async (videoId: string): Promise<VideoInfo | null> => {
   try {
+    console.log(`Fetching video info for: ${videoId}`);
+    
     const { data, error } = await supabase.functions.invoke('youtube-metadata', {
       body: { videoId }
     });
 
     if (error) {
       console.error('Error fetching video metadata:', error);
+      if (error.message?.includes('not found')) {
+        throw new Error('YouTube metadata function is not available. Please check that edge functions are properly deployed.');
+      }
       return null;
     }
 
+    console.log('Video info fetched successfully');
     return data;
   } catch (error) {
     console.error('Error fetching video info:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -53,7 +59,10 @@ export const getTranscript = async (videoId: string): Promise<string | null> => 
     if (error) {
       console.error('Transcript extraction error:', error);
       
-      // Check for specific error types
+      if (error.message?.includes('not found')) {
+        throw new Error('YouTube transcript function is not available. Please check that edge functions are properly deployed.');
+      }
+      
       if (error.message?.includes('No captions found')) {
         console.log('Video does not have accessible captions');
         return null;
@@ -72,7 +81,7 @@ export const getTranscript = async (videoId: string): Promise<string | null> => 
     
   } catch (error) {
     console.error('Error in getTranscript:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -84,6 +93,9 @@ export const getTranscriptWithDetails = async (videoId: string): Promise<Transcr
 
     if (error) {
       console.error('Error fetching transcript with details:', error);
+      if (error.message?.includes('not found')) {
+        throw new Error('YouTube transcript function is not available. Please check that edge functions are properly deployed.');
+      }
       return null;
     }
 
@@ -94,6 +106,6 @@ export const getTranscriptWithDetails = async (videoId: string): Promise<Transcr
     };
   } catch (error) {
     console.error('Error fetching transcript with details:', error);
-    return null;
+    throw error;
   }
 };
