@@ -34,38 +34,29 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
       setCurrentStep('Fetching video information...');
       const videoInfo = await getVideoInfo(videoId);
       if (!videoInfo) {
-        throw new Error('Could not fetch video information. The video may be private, unavailable, or the URL may be incorrect.');
+        throw new Error('Could not fetch video information. Please check the video URL.');
       }
 
-      // Step 2: Get transcript with improved error handling
-      setCurrentStep('Extracting video transcript and captions...');
+      // Step 2: Get transcript
+      setCurrentStep('Extracting video captions...');
       const transcript = await getTranscript(videoId);
       if (!transcript) {
-        throw new Error(`Could not extract transcript from this video. This could be because:
-        • The video doesn't have captions or subtitles
-        • The video is in a language that isn't supported
-        • The video is too short or doesn't contain speech
-        • The video may be music-only or have background music that interferes with speech recognition
-        
-        Try using a video that has captions available or clear speech content.`);
+        throw new Error('This video does not have captions available. Please try a video with captions or subtitles enabled.');
       }
 
-      // Step 3: Generate questions with AI
-      setCurrentStep('Analyzing content and generating personalized questions...');
+      // Step 3: Generate quiz
+      setCurrentStep('Generating personalized questions...');
       const quiz = await generateQuizFromVideo(videoId, videoInfo.title, transcript, videoInfo.description);
       if (!quiz) {
-        throw new Error('Failed to generate quiz questions. The video content may not be suitable for quiz generation. Please try a different video with educational content.');
+        throw new Error('Failed to generate quiz questions. Please try again.');
       }
 
-      // Step 4: Save to database
+      // Step 4: Save session
       setCurrentStep('Saving your learning session...');
       const sessionId = await createQuizSession(quiz, videoInfo, transcript);
       if (!sessionId) {
         throw new Error('Failed to save quiz session. Please try again.');
       }
-
-      setCurrentStep('Finalizing your learning experience...');
-      await new Promise(resolve => setTimeout(resolve, 500));
 
       onQuizGenerated(quiz, sessionId);
     } catch (err) {
@@ -100,7 +91,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              💡 Tip: Works best with educational videos that have clear speech and captions
+              💡 Tip: Works best with educational videos that have captions or subtitles
             </p>
           </div>
 
@@ -110,7 +101,15 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
                 <span className="text-red-500 text-xl">⚠️</span>
                 <div>
                   <p className="text-red-600 font-medium mb-2">Unable to process this video</p>
-                  <div className="text-red-600 text-sm whitespace-pre-line">{error}</div>
+                  <p className="text-red-600 text-sm">{error}</p>
+                  <div className="mt-3 text-sm text-gray-600">
+                    <p className="font-medium">Try these suggestions:</p>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>Use a video with captions or subtitles enabled</li>
+                      <li>Try educational content with clear speech</li>
+                      <li>Check if the video is public and accessible</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -124,7 +123,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
             {loading ? (
               <div className="flex items-center justify-center space-x-3">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                <span>Creating Your Personalized Learning Experience...</span>
+                <span>Creating Your Learning Experience...</span>
               </div>
             ) : (
               <div className="flex items-center justify-center space-x-2">
@@ -138,18 +137,10 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
         {loading && currentStep && (
           <div className="mt-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6">
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-700 mb-3">Creating Your Personalized Quiz</h3>
-              <div className="space-y-3 text-sm text-gray-600">
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
-                  <span>{currentStep}</span>
-                </div>
-                <div className="text-xs text-gray-500 mt-4">
-                  <p>🎯 Extracting captions and speech content</p>
-                  <p>🧠 Generating comprehension questions</p>
-                  <p>💭 Creating reflective prompts about your learning goals</p>
-                  <p>📈 Designing application and goal-setting questions</p>
-                </div>
+              <h3 className="text-lg font-semibold text-gray-700 mb-3">Creating Your Quiz</h3>
+              <div className="flex items-center justify-center space-x-2">
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                <span className="text-sm text-gray-600">{currentStep}</span>
               </div>
             </div>
           </div>

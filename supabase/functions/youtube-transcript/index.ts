@@ -16,19 +16,31 @@ serve(async (req) => {
     const { videoId } = await req.json();
     
     if (!videoId) {
+      console.log('No video ID provided');
       throw new Error('Video ID is required');
     }
 
-    console.log(`Starting transcript extraction for video: ${videoId}`);
+    console.log(`Getting transcript for video: ${videoId}`);
 
-    // Simple, direct approach to YouTube's transcript API
-    const transcript = await getYouTubeTranscript(videoId);
+    // Try to get transcript using YouTube's timedtext API
+    const transcript = await getTranscript(videoId);
 
-    if (!transcript || transcript.length < 50) {
-      throw new Error('No captions found. This video may not have captions available, or they may be disabled.');
+    if (!transcript) {
+      console.log('No transcript found');
+      return new Response(JSON.stringify({ 
+        error: 'No transcript available',
+        suggestions: [
+          'This video does not have captions or subtitles available',
+          'Try a video with auto-generated or manual captions',
+          'Educational videos often have better caption availability'
+        ]
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    console.log(`Successfully extracted transcript, length: ${transcript.length}`);
+    console.log(`Transcript found, length: ${transcript.length}`);
 
     return new Response(JSON.stringify({
       transcript: transcript,
@@ -38,13 +50,13 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error fetching YouTube transcript:', error);
+    console.error('Transcript extraction error:', error);
     return new Response(JSON.stringify({ 
-      error: error.message,
+      error: error.message || 'Failed to extract transcript',
       suggestions: [
-        'Make sure the video has captions/subtitles enabled',
-        'Try a different educational video with clear speech',
-        'Check if the video is public and accessible'
+        'Check if the video has captions enabled',
+        'Try a different video with clear educational content',
+        'Verify the YouTube URL is correct and the video is public'
       ]
     }), {
       status: 500,
@@ -53,108 +65,86 @@ serve(async (req) => {
   }
 });
 
-async function getYouTubeTranscript(videoId: string): Promise<string | null> {
+async function getTranscript(videoId: string): Promise<string | null> {
   try {
-    console.log('Attempting to get transcript via direct API...');
+    // Step 1: Get caption track list
+    const trackUrl = `https://www.youtube.com/api/timedtext?type=list&v=${videoId}`;
+    console.log(`Fetching caption tracks: ${trackUrl}`);
     
-    // Step 1: Get available caption tracks
-    const trackListUrl = `https://www.youtube.com/api/timedtext?type=list&v=${videoId}`;
-    console.log(`Fetching caption tracks from: ${trackListUrl}`);
-    
-    const trackResponse = await fetch(trackListUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
-    
+    const trackResponse = await fetch(trackUrl);
     if (!trackResponse.ok) {
-      console.log(`Track list request failed: ${trackResponse.status}`);
+      console.log(`Track request failed: ${trackResponse.status}`);
       return null;
     }
     
     const trackXml = await trackResponse.text();
-    console.log(`Track list XML received, length: ${trackXml.length}`);
+    console.log(`Track XML length: ${trackXml.length}`);
     
-    if (trackXml.length < 100) {
-      console.log('Track list too short, likely no captions');
+    if (trackXml.length < 50) {
+      console.log('No caption tracks found');
       return null;
     }
     
-    // Step 2: Extract language codes from the XML
-    const langMatches = [...trackXml.matchAll(/lang_code="([^"]+)"/g)];
-    console.log(`Found ${langMatches.length} language tracks`);
-    
-    if (langMatches.length === 0) {
-      console.log('No language codes found');
+    // Step 2: Extract available languages
+    const langMatches = trackXml.match(/lang_code="([^"]+)"/g);
+    if (!langMatches || langMatches.length === 0) {
+      console.log('No language codes found in tracks');
       return null;
     }
     
-    // Step 3: Try English first, then fall back to any available
-    const englishLang = langMatches.find(match => match[1].startsWith('en'));
-    const selectedLang = englishLang ? englishLang[1] : langMatches[0][1];
+    // Extract the first language code
+    const firstLang = langMatches[0].match(/lang_code="([^"]+)"/);
+    if (!firstLang) {
+      console.log('Could not parse language code');
+      return null;
+    }
     
-    console.log(`Using language: ${selectedLang}`);
+    const langCode = firstLang[1];
+    console.log(`Using language: ${langCode}`);
     
-    // Step 4: Get the actual transcript
-    const transcriptUrl = `https://www.youtube.com/api/timedtext?lang=${selectedLang}&v=${videoId}&fmt=srv3`;
-    console.log(`Fetching transcript from: ${transcriptUrl}`);
+    // Step 3: Get the actual transcript
+    const transcriptUrl = `https://www.youtube.com/api/timedtext?lang=${langCode}&v=${videoId}`;
+    console.log(`Fetching transcript: ${transcriptUrl}`);
     
-    const transcriptResponse = await fetch(transcriptUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
-    
+    const transcriptResponse = await fetch(transcriptUrl);
     if (!transcriptResponse.ok) {
       console.log(`Transcript request failed: ${transcriptResponse.status}`);
       return null;
     }
     
     const transcriptXml = await transcriptResponse.text();
-    console.log(`Transcript XML received, length: ${transcriptXml.length}`);
+    console.log(`Transcript XML length: ${transcriptXml.length}`);
     
-    return parseTranscriptXml(transcriptXml);
-    
-  } catch (error) {
-    console.log('Direct transcript method failed:', error.message);
-    return null;
-  }
-}
-
-function parseTranscriptXml(xml: string): string | null {
-  try {
-    // Extract text from XML format
-    const textPattern = /<text[^>]*>(.*?)<\/text>/gs;
-    const matches = [...xml.matchAll(textPattern)];
-    
-    if (matches.length === 0) {
-      console.log('No text segments found in XML');
+    // Step 4: Parse the XML and extract text
+    const textMatches = transcriptXml.match(/<text[^>]*>(.*?)<\/text>/g);
+    if (!textMatches || textMatches.length === 0) {
+      console.log('No text segments found');
       return null;
     }
     
-    const segments = matches.map(match => {
-      return match[1]
+    const textSegments = textMatches.map(match => {
+      const textContent = match.replace(/<text[^>]*>/, '').replace(/<\/text>/, '');
+      return textContent
         .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
-        .replace(/<[^>]*>/g, '')
         .trim();
     }).filter(text => text.length > 0);
     
-    if (segments.length === 0) {
-      console.log('No valid text segments found');
+    if (textSegments.length === 0) {
+      console.log('No valid text segments');
       return null;
     }
     
-    const transcript = segments.join(' ');
-    console.log(`Parsed ${segments.length} segments, total length: ${transcript.length}`);
+    const fullTranscript = textSegments.join(' ');
+    console.log(`Final transcript length: ${fullTranscript.length}`);
     
-    return transcript;
+    return fullTranscript.length > 50 ? fullTranscript : null;
     
   } catch (error) {
-    console.log('Error parsing transcript XML:', error.message);
+    console.error('Error in getTranscript:', error);
     return null;
   }
 }

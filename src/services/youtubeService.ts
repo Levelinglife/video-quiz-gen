@@ -34,10 +34,7 @@ export const getVideoInfo = async (videoId: string): Promise<VideoInfo | null> =
 
     if (error) {
       console.error('Error fetching video metadata:', error);
-      if (error.message?.includes('not found')) {
-        throw new Error('YouTube metadata function is not available. Please check that edge functions are properly deployed.');
-      }
-      return null;
+      throw new Error('Could not fetch video information. Please check the video URL and try again.');
     }
 
     console.log('Video info fetched successfully');
@@ -50,37 +47,33 @@ export const getVideoInfo = async (videoId: string): Promise<VideoInfo | null> =
 
 export const getTranscript = async (videoId: string): Promise<string | null> => {
   try {
-    console.log(`Attempting to get transcript for video: ${videoId}`);
+    console.log(`Getting transcript for video: ${videoId}`);
     
     const { data, error } = await supabase.functions.invoke('youtube-transcript', {
       body: { videoId }
     });
 
     if (error) {
-      console.error('Transcript extraction error:', error);
+      console.error('Transcript function error:', error);
       
-      if (error.message?.includes('not found')) {
-        throw new Error('YouTube transcript function is not available. Please check that edge functions are properly deployed.');
+      // Handle specific error cases
+      if (error.message?.includes('Edge Function returned a non-2xx status code')) {
+        throw new Error('Transcript service is temporarily unavailable. Please try again in a moment.');
       }
       
-      if (error.message?.includes('No captions found')) {
-        console.log('Video does not have accessible captions');
-        return null;
-      }
-      
+      throw new Error('Could not extract transcript from this video. Please try a video with captions available.');
+    }
+
+    if (!data || !data.transcript) {
+      console.log('No transcript data returned');
       return null;
     }
 
-    if (data?.transcript && data.transcript.length > 50) {
-      console.log(`Successfully extracted transcript, length: ${data.transcript.length}`);
-      return data.transcript;
-    } else {
-      console.log('Transcript too short or empty');
-      return null;
-    }
+    console.log(`Transcript extracted successfully, length: ${data.transcript.length}`);
+    return data.transcript;
     
   } catch (error) {
-    console.error('Error in getTranscript:', error);
+    console.error('Error getting transcript:', error);
     throw error;
   }
 };
@@ -91,11 +84,8 @@ export const getTranscriptWithDetails = async (videoId: string): Promise<Transcr
       body: { videoId }
     });
 
-    if (error) {
+    if (error || !data) {
       console.error('Error fetching transcript with details:', error);
-      if (error.message?.includes('not found')) {
-        throw new Error('YouTube transcript function is not available. Please check that edge functions are properly deployed.');
-      }
       return null;
     }
 
@@ -106,6 +96,6 @@ export const getTranscriptWithDetails = async (videoId: string): Promise<Transcr
     };
   } catch (error) {
     console.error('Error fetching transcript with details:', error);
-    throw error;
+    return null;
   }
 };
