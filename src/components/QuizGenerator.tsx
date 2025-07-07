@@ -37,7 +37,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
     setDebugInfo([]);
 
     try {
-      addDebugInfo(`Starting quiz generation for video ID: ${videoId}`);
+      addDebugInfo(`Starting enhanced quiz generation for video ID: ${videoId}`);
 
       // Step 1: Get video info
       setCurrentStep('Fetching video information...');
@@ -50,17 +50,18 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
       
       addDebugInfo(`Video info retrieved: "${videoInfo.title}" by ${videoInfo.channelTitle} (${videoInfo.duration})`);
 
-      // Step 2: Get transcript
-      setCurrentStep('Extracting video captions...');
-      addDebugInfo('Attempting to extract transcript/captions using multiple methods...');
+      // Step 2: Get transcript with enhanced extraction
+      setCurrentStep('Extracting video captions using enhanced methods...');
+      addDebugInfo('Attempting to extract transcript using multiple enhanced methods...');
+      addDebugInfo('Trying: YouTube API, Direct Caption Fetch, Alternative Methods...');
       
       const transcript = await getTranscript(videoId);
       if (!transcript) {
-        throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
+        throw new Error('Unable to extract transcript from this video. This could be because:\n• The video is private or restricted\n• No captions are available for this video\n• The video is too new and captions haven\'t been generated yet\n• The video content doesn\'t support automatic caption generation\n\nPlease try a different video with visible captions (CC button should be available on YouTube).');
       }
       
-      addDebugInfo(`Transcript extracted successfully - ${transcript.length} characters`);
-      addDebugInfo(`First 100 chars: "${transcript.substring(0, 100)}..."`);
+      addDebugInfo(`SUCCESS! Transcript extracted - ${transcript.length} characters`);
+      addDebugInfo(`Preview: "${transcript.substring(0, 150)}..."`);
 
       // Step 3: Generate quiz
       setCurrentStep('Generating personalized questions...');
@@ -83,14 +84,14 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
       }
       
       addDebugInfo(`Quiz session saved with ID: ${sessionId}`);
-      addDebugInfo('Quiz generation completed successfully!');
+      addDebugInfo('🎉 Quiz generation completed successfully!');
 
       onQuizGenerated(quiz, sessionId);
     } catch (err) {
       console.error('Quiz generation error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate quiz. Please try again.';
       setError(errorMessage);
-      addDebugInfo(`Error occurred: ${errorMessage}`);
+      addDebugInfo(`❌ Error occurred: ${errorMessage}`);
     } finally {
       setLoading(false);
       setCurrentStep('');
@@ -100,7 +101,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
   const renderErrorMessage = () => {
     if (!error) return null;
 
-    const isTranscriptError = error.includes('could not extract transcript') || error.includes('doesn\'t have captions');
+    const isTranscriptError = error.toLowerCase().includes('transcript') || error.toLowerCase().includes('captions');
     
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl p-4">
@@ -108,7 +109,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
           <span className="text-red-500 text-xl">⚠️</span>
           <div>
             <p className="text-red-600 font-medium mb-2">
-              {isTranscriptError ? 'Unable to process this video' : 'An error occurred'}
+              {isTranscriptError ? 'Unable to extract captions from this video' : 'An error occurred'}
             </p>
             <div className="text-red-600 text-sm whitespace-pre-line mb-3">{error}</div>
             
@@ -116,17 +117,18 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
               <div className="mt-3 text-sm text-gray-600">
                 <p className="font-medium">Try these suggestions:</p>
                 <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>Use a video with captions or subtitles enabled</li>
-                  <li>Try educational content from channels like Khan Academy, TED, or Coursera</li>
-                  <li>Look for the CC (closed captions) button on the YouTube player to verify captions exist</li>
-                  <li>Try a different video with clear, spoken content</li>
+                  <li>Make sure the video has the CC (closed captions) button visible on YouTube</li>
+                  <li>Try educational content (TED Talks, Khan Academy, Coursera, etc.)</li>
+                  <li>Ensure the video is public and not private/restricted</li>
+                  <li>Try a different video that you know has captions</li>
+                  <li>Check if the video is too new (captions may not be generated yet)</li>
                 </ul>
               </div>
             )}
             
             {debugInfo.length > 0 && (
               <details className="mt-3">
-                <summary className="text-xs text-gray-500 cursor-pointer">Debug Information</summary>
+                <summary className="text-xs text-gray-500 cursor-pointer">Show Debug Information</summary>
                 <div className="mt-2 p-3 bg-gray-100 rounded text-xs font-mono max-h-40 overflow-y-auto">
                   {debugInfo.map((info, index) => (
                     <div key={index} className="text-gray-700 mb-1">{info}</div>
@@ -163,7 +165,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              💡 Tip: Works best with educational videos that have captions (CC button visible on YouTube)
+              💡 Tip: Make sure the CC (closed captions) button is visible on the YouTube video
             </p>
           </div>
 

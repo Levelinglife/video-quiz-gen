@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface VideoInfo {
@@ -14,8 +13,8 @@ export interface VideoInfo {
 
 export interface TranscriptResult {
   transcript: string;
-  source: 'auto-generated' | 'manual' | 'multi-language' | 'captions' | 'speech-to-text';
-  suggestions?: string[];
+  source: 'auto-generated' | 'manual' | 'alternative' | 'captions';
+  language?: string;
   videoId?: string;
   length?: number;
 }
@@ -53,42 +52,48 @@ export const getVideoInfo = async (videoId: string): Promise<VideoInfo | null> =
 
 export const getTranscript = async (videoId: string): Promise<string | null> => {
   try {
-    console.log(`Starting transcript extraction for video: ${videoId}`);
+    console.log(`Starting enhanced transcript extraction for video: ${videoId}`);
     
     const { data, error } = await supabase.functions.invoke('youtube-transcript', {
       body: { videoId }
     });
 
     if (error) {
-      console.error('Transcript function error:', error);
+      console.error('Transcript function error details:', error);
       
-      // More specific error handling
+      // Enhanced error handling
       if (error.message?.includes('Function not found') || error.message?.includes('404')) {
-        throw new Error('Transcript service is not available. Please try again in a moment.');
+        throw new Error('Transcript service is temporarily unavailable. Please try again in a moment.');
       }
       
       if (error.message?.includes('Edge Function returned a non-2xx status code')) {
-        throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
+        // Check if we have more specific error info from the response
+        throw new Error('Unable to extract transcript from this video. This could be because:\n• The video is private or restricted\n• No captions are available for this video\n• The video is too new and captions haven\'t been generated yet\n• The video content doesn\'t support automatic caption generation\n\nPlease try a different video with visible captions (CC button should be available on YouTube).');
       }
       
       throw new Error(`Transcript extraction failed: ${error.message}`);
     }
 
     if (!data) {
-      console.log('No transcript data returned from function');
-      throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
+      console.log('No transcript data returned from enhanced function');
+      throw new Error('Unable to extract transcript from this video. This could be because:\n• The video is private or restricted\n• No captions are available for this video\n• The video is too new and captions haven\'t been generated yet\n• The video content doesn\'t support automatic caption generation\n\nPlease try a different video with visible captions (CC button should be available on YouTube).');
     }
 
     if (!data.transcript) {
-      console.log('Transcript field is empty in response');
-      throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
+      console.log('Transcript field is empty in enhanced response');
+      throw new Error('Unable to extract transcript from this video. This could be because:\n• The video is private or restricted\n• No captions are available for this video\n• The video is too new and captions haven\'t been generated yet\n• The video content doesn\'t support automatic caption generation\n\nPlease try a different video with visible captions (CC button should be available on YouTube).');
     }
 
-    console.log(`Transcript extracted successfully - Length: ${data.length || data.transcript.length} characters, Source: ${data.source || 'unknown'}`);
+    console.log(`Enhanced transcript extracted successfully!`);
+    console.log(`- Length: ${data.length || data.transcript.length} characters`);
+    console.log(`- Source: ${data.source || 'unknown'}`);
+    console.log(`- Language: ${data.language || 'unknown'}`);
+    console.log(`- First 200 chars: "${data.transcript.substring(0, 200)}..."`);
+    
     return data.transcript;
     
   } catch (error) {
-    console.error('Error getting transcript:', error);
+    console.error('Error getting enhanced transcript:', error);
     throw error;
   }
 };
@@ -114,9 +119,9 @@ export const getTranscriptWithDetails = async (videoId: string): Promise<Transcr
     return {
       transcript: data.transcript,
       source: data.source || 'captions',
+      language: data.language,
       videoId: data.videoId || videoId,
-      length: data.length || data.transcript.length,
-      suggestions: data.suggestions
+      length: data.length || data.transcript.length
     };
   } catch (error) {
     console.error('Error fetching transcript with details:', error);
