@@ -14,8 +14,10 @@ export interface VideoInfo {
 
 export interface TranscriptResult {
   transcript: string;
-  source: 'captions' | 'speech-to-text';
+  source: 'auto-generated' | 'manual' | 'multi-language' | 'captions' | 'speech-to-text';
   suggestions?: string[];
+  videoId?: string;
+  length?: number;
 }
 
 export const extractVideoId = (url: string): string | null => {
@@ -51,7 +53,7 @@ export const getVideoInfo = async (videoId: string): Promise<VideoInfo | null> =
 
 export const getTranscript = async (videoId: string): Promise<string | null> => {
   try {
-    console.log(`Getting transcript for video: ${videoId}`);
+    console.log(`Starting transcript extraction for video: ${videoId}`);
     
     const { data, error } = await supabase.functions.invoke('youtube-transcript', {
       body: { videoId }
@@ -60,14 +62,13 @@ export const getTranscript = async (videoId: string): Promise<string | null> => 
     if (error) {
       console.error('Transcript function error:', error);
       
-      // Check if it's a function not found error
+      // More specific error handling
       if (error.message?.includes('Function not found') || error.message?.includes('404')) {
-        throw new Error('Transcript service is not available. Please check if the edge function is deployed.');
+        throw new Error('Transcript service is not available. Please try again in a moment.');
       }
       
-      // Handle other specific error cases
       if (error.message?.includes('Edge Function returned a non-2xx status code')) {
-        throw new Error('Transcript extraction failed. The video may not have captions available.');
+        throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
       }
       
       throw new Error(`Transcript extraction failed: ${error.message}`);
@@ -75,15 +76,15 @@ export const getTranscript = async (videoId: string): Promise<string | null> => 
 
     if (!data) {
       console.log('No transcript data returned from function');
-      throw new Error('No transcript data received from the service');
+      throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
     }
 
     if (!data.transcript) {
       console.log('Transcript field is empty in response');
-      throw new Error('The video does not have captions or subtitles available');
+      throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
     }
 
-    console.log(`Transcript extracted successfully - Length: ${data.transcript.length} characters, Source: ${data.source || 'unknown'}`);
+    console.log(`Transcript extracted successfully - Length: ${data.length || data.transcript.length} characters, Source: ${data.source || 'unknown'}`);
     return data.transcript;
     
   } catch (error) {
@@ -94,18 +95,27 @@ export const getTranscript = async (videoId: string): Promise<string | null> => 
 
 export const getTranscriptWithDetails = async (videoId: string): Promise<TranscriptResult | null> => {
   try {
+    console.log(`Getting detailed transcript for video: ${videoId}`);
+    
     const { data, error } = await supabase.functions.invoke('youtube-transcript', {
       body: { videoId }
     });
 
-    if (error || !data) {
+    if (error) {
       console.error('Error fetching transcript with details:', error);
+      return null;
+    }
+
+    if (!data || !data.transcript) {
+      console.log('No transcript data in detailed response');
       return null;
     }
 
     return {
       transcript: data.transcript,
       source: data.source || 'captions',
+      videoId: data.videoId || videoId,
+      length: data.length || data.transcript.length,
       suggestions: data.suggestions
     };
   } catch (error) {

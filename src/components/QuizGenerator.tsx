@@ -17,7 +17,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
 
   const addDebugInfo = (info: string) => {
     console.log(`[QuizGenerator] ${info}`);
-    setDebugInfo(prev => [...prev, info]);
+    setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${info}`]);
   };
 
   const handleGenerateQuiz = async () => {
@@ -41,25 +41,26 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
 
       // Step 1: Get video info
       setCurrentStep('Fetching video information...');
-      addDebugInfo('Fetching video metadata...');
+      addDebugInfo('Fetching video metadata from YouTube API...');
       
       const videoInfo = await getVideoInfo(videoId);
       if (!videoInfo) {
-        throw new Error('Could not fetch video information. Please check the video URL.');
+        throw new Error('Could not fetch video information. Please check the video URL and try again.');
       }
       
-      addDebugInfo(`Video info retrieved: "${videoInfo.title}" by ${videoInfo.channelTitle}`);
+      addDebugInfo(`Video info retrieved: "${videoInfo.title}" by ${videoInfo.channelTitle} (${videoInfo.duration})`);
 
       // Step 2: Get transcript
       setCurrentStep('Extracting video captions...');
-      addDebugInfo('Attempting to extract transcript/captions...');
+      addDebugInfo('Attempting to extract transcript/captions using multiple methods...');
       
       const transcript = await getTranscript(videoId);
       if (!transcript) {
-        throw new Error('This video does not have captions available. Please try a video with captions or subtitles enabled.');
+        throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
       }
       
       addDebugInfo(`Transcript extracted successfully - ${transcript.length} characters`);
+      addDebugInfo(`First 100 chars: "${transcript.substring(0, 100)}..."`);
 
       // Step 3: Generate quiz
       setCurrentStep('Generating personalized questions...');
@@ -67,10 +68,10 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
       
       const quiz = await generateQuizFromVideo(videoId, videoInfo.title, transcript, videoInfo.description);
       if (!quiz) {
-        throw new Error('Failed to generate quiz questions. Please try again.');
+        throw new Error('Failed to generate quiz questions. The AI service may be temporarily unavailable. Please try again.');
       }
       
-      addDebugInfo(`Quiz generated with ${quiz.questions.length} questions`);
+      addDebugInfo(`Quiz generated successfully with ${quiz.questions.length} questions`);
 
       // Step 4: Save session
       setCurrentStep('Saving your learning session...');
@@ -82,6 +83,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
       }
       
       addDebugInfo(`Quiz session saved with ID: ${sessionId}`);
+      addDebugInfo('Quiz generation completed successfully!');
 
       onQuizGenerated(quiz, sessionId);
     } catch (err) {
@@ -93,6 +95,49 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
       setLoading(false);
       setCurrentStep('');
     }
+  };
+
+  const renderErrorMessage = () => {
+    if (!error) return null;
+
+    const isTranscriptError = error.includes('could not extract transcript') || error.includes('doesn\'t have captions');
+    
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+        <div className="flex items-start space-x-3">
+          <span className="text-red-500 text-xl">⚠️</span>
+          <div>
+            <p className="text-red-600 font-medium mb-2">
+              {isTranscriptError ? 'Unable to process this video' : 'An error occurred'}
+            </p>
+            <div className="text-red-600 text-sm whitespace-pre-line mb-3">{error}</div>
+            
+            {isTranscriptError && (
+              <div className="mt-3 text-sm text-gray-600">
+                <p className="font-medium">Try these suggestions:</p>
+                <ul className="list-disc list-inside mt-1 space-y-1">
+                  <li>Use a video with captions or subtitles enabled</li>
+                  <li>Try educational content from channels like Khan Academy, TED, or Coursera</li>
+                  <li>Look for the CC (closed captions) button on the YouTube player to verify captions exist</li>
+                  <li>Try a different video with clear, spoken content</li>
+                </ul>
+              </div>
+            )}
+            
+            {debugInfo.length > 0 && (
+              <details className="mt-3">
+                <summary className="text-xs text-gray-500 cursor-pointer">Debug Information</summary>
+                <div className="mt-2 p-3 bg-gray-100 rounded text-xs font-mono max-h-40 overflow-y-auto">
+                  {debugInfo.map((info, index) => (
+                    <div key={index} className="text-gray-700 mb-1">{info}</div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -118,41 +163,11 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              💡 Tip: Works best with educational videos that have captions or subtitles
+              💡 Tip: Works best with educational videos that have captions (CC button visible on YouTube)
             </p>
           </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <div className="flex items-start space-x-3">
-                <span className="text-red-500 text-xl">⚠️</span>
-                <div>
-                  <p className="text-red-600 font-medium mb-2">Unable to process this video</p>
-                  <p className="text-red-600 text-sm">{error}</p>
-                  <div className="mt-3 text-sm text-gray-600">
-                    <p className="font-medium">Try these suggestions:</p>
-                    <ul className="list-disc list-inside mt-1 space-y-1">
-                      <li>Use a video with captions or subtitles enabled</li>
-                      <li>Try educational content with clear speech</li>
-                      <li>Check if the video is public and accessible</li>
-                      <li>Try a different video from a popular educational channel</li>
-                    </ul>
-                  </div>
-                  
-                  {debugInfo.length > 0 && (
-                    <details className="mt-3">
-                      <summary className="text-xs text-gray-500 cursor-pointer">Debug Information</summary>
-                      <div className="mt-2 p-2 bg-gray-100 rounded text-xs font-mono">
-                        {debugInfo.map((info, index) => (
-                          <div key={index} className="text-gray-700">{info}</div>
-                        ))}
-                      </div>
-                    </details>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+          {renderErrorMessage()}
 
           <button
             onClick={handleGenerateQuiz}
@@ -177,16 +192,16 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
           <div className="mt-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6">
             <div className="text-center">
               <h3 className="text-lg font-semibold text-gray-700 mb-3">Creating Your Quiz</h3>
-              <div className="flex items-center justify-center space-x-2">
+              <div className="flex items-center justify-center space-x-2 mb-4">
                 <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
                 <span className="text-sm text-gray-600">{currentStep}</span>
               </div>
               
               {debugInfo.length > 0 && (
-                <div className="mt-4 text-left">
+                <div className="text-left">
                   <details>
                     <summary className="text-xs text-gray-500 cursor-pointer text-center">View Progress Details</summary>
-                    <div className="mt-2 p-2 bg-white/50 rounded text-xs font-mono text-left max-h-32 overflow-y-auto">
+                    <div className="mt-2 p-3 bg-white/50 rounded text-xs font-mono text-left max-h-32 overflow-y-auto">
                       {debugInfo.map((info, index) => (
                         <div key={index} className="text-gray-700 mb-1">{info}</div>
                       ))}
