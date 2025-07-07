@@ -52,51 +52,46 @@ export const getVideoInfo = async (videoId: string): Promise<VideoInfo | null> =
 
 export const getTranscript = async (videoId: string): Promise<string | null> => {
   try {
-    console.log(`Starting comprehensive transcript extraction for video: ${videoId}`);
+    console.log(`Starting transcript extraction for video: ${videoId}`);
+    console.log(`Calling function endpoint: /functions/v1/youtube-transcript`);
     
     const { data, error } = await supabase.functions.invoke('youtube-transcript', {
       body: { videoId }
     });
 
     if (error) {
-      console.error('Complete transcript function error details:', error);
+      console.error('Transcript function error details:', error);
       
-      // More detailed error messages based on common issues
-      if (error.message?.includes('Function not found') || error.message?.includes('404')) {
-        throw new Error('Transcript service is temporarily unavailable. Please try again in a moment.');
+      // Check for specific error types
+      if (error.message?.includes('404') || error.message?.includes('Function not found')) {
+        throw new Error('The transcript extraction service is not available. Please contact support or try again later.');
       }
       
       if (error.message?.includes('Edge Function returned a non-2xx status code')) {
-        console.log('Edge function returned non-2xx status, checking for more details...');
+        console.log('Edge function returned error status, checking response...');
         
-        // Try to get more specific error information
-        try {
-          const errorDetails = JSON.parse(error.message || '{}');
-          if (errorDetails.error) {
-            throw new Error(`Transcript extraction failed: ${errorDetails.error}\n${errorDetails.message || ''}\n${errorDetails.details || ''}`);
-          }
-        } catch (parseError) {
-          // Fallback to generic error
-          console.error('Could not parse error details:', parseError);
+        // The error response should contain our custom error message
+        if (data && data.error && data.message) {
+          throw new Error(`${data.message}\n\nDetails: ${data.details || 'No additional details available'}`);
         }
         
-        throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
+        throw new Error('Could not extract transcript from this video. The video may not have captions available or may be private/restricted.');
       }
       
       throw new Error(`Transcript extraction failed: ${error.message}`);
     }
 
     if (!data) {
-      console.log('No transcript data returned from comprehensive function');
-      throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
+      console.log('No transcript data returned from function');
+      throw new Error('No transcript data received. The video may not have captions available.');
     }
 
     if (!data.transcript) {
-      console.log('Transcript field is empty in comprehensive response');
-      throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
+      console.log('Transcript field is empty in response');
+      throw new Error('No transcript content found. The video may not have captions available.');
     }
 
-    console.log(`Comprehensive transcript extracted successfully!`);
+    console.log(`Transcript extracted successfully!`);
     console.log(`- Length: ${data.length || data.transcript.length} characters`);
     console.log(`- Source: ${data.source || 'unknown'}`);
     console.log(`- Language: ${data.language || 'unknown'}`);
@@ -105,7 +100,7 @@ export const getTranscript = async (videoId: string): Promise<string | null> => 
     return data.transcript;
     
   } catch (error) {
-    console.error('Error getting comprehensive transcript:', error);
+    console.error('Error getting transcript:', error);
     throw error;
   }
 };

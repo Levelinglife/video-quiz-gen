@@ -36,7 +36,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
     setDebugInfo([]);
 
     try {
-      addDebugInfo(`🚀 Starting comprehensive quiz generation for video ID: ${videoId}`);
+      addDebugInfo(`🚀 Starting enhanced quiz generation for video ID: ${videoId}`);
 
       // Step 1: Get video info
       setCurrentStep('📹 Fetching video information...');
@@ -49,14 +49,14 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
       
       addDebugInfo(`✅ Video info retrieved: "${videoInfo.title}" by ${videoInfo.channelTitle} (${videoInfo.duration})`);
 
-      // Step 2: Get transcript with comprehensive extraction
-      setCurrentStep('🎯 Extracting captions using advanced methods...');
-      addDebugInfo('🔍 Attempting comprehensive transcript extraction...');
-      addDebugInfo('📋 Methods: Watch Page Scraping → Direct API calls → Alternative endpoints');
+      // Step 2: Get transcript
+      setCurrentStep('🎯 Extracting captions from video...');
+      addDebugInfo('Attempting to extract transcript using multiple enhanced methods...');
+      addDebugInfo('Trying: YouTube API, Direct Caption Fetch, Alternative Methods...');
       
       const transcript = await getTranscript(videoId);
       if (!transcript) {
-        throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
+        throw new Error('Unable to extract transcript from this video. This could be because:\n• The video is private or restricted\n• No captions are available for this video\n• The video is too new and captions haven\'t been generated yet\n• The video content doesn\'t support automatic caption generation\n\nPlease try a different video with visible captions (CC button should be available on YouTube).');
       }
       
       addDebugInfo(`🎉 SUCCESS! Transcript extracted - ${transcript.length} characters`);
@@ -101,6 +101,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
     if (!error) return null;
 
     const isTranscriptError = error.toLowerCase().includes('transcript') || error.toLowerCase().includes('captions');
+    const isServiceError = error.toLowerCase().includes('service') || error.toLowerCase().includes('not available');
     
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl p-4">
@@ -108,11 +109,24 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
           <span className="text-red-500 text-xl">⚠️</span>
           <div>
             <p className="text-red-600 font-medium mb-2">
-              {isTranscriptError ? 'Unable to extract captions from this video' : 'An error occurred'}
+              {isServiceError ? 'Service Issue Detected' : 
+               isTranscriptError ? 'Unable to extract captions from this video' : 
+               'An error occurred'}
             </p>
             <div className="text-red-600 text-sm whitespace-pre-line mb-3">{error}</div>
             
-            {isTranscriptError && (
+            {isServiceError && (
+              <div className="mt-3 text-sm text-gray-600">
+                <p className="font-medium">🔧 Technical Issue:</p>
+                <ul className="list-disc list-inside mt-1 space-y-1">
+                  <li>The transcript extraction service may be temporarily unavailable</li>
+                  <li>Please try again in a few minutes</li>
+                  <li>If the problem persists, contact support</li>
+                </ul>
+              </div>
+            )}
+            
+            {isTranscriptError && !isServiceError && (
               <div className="mt-3 text-sm text-gray-600">
                 <p className="font-medium">💡 Try these suggestions:</p>
                 <ul className="list-disc list-inside mt-1 space-y-1">
