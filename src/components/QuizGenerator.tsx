@@ -13,6 +13,12 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState('');
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+
+  const addDebugInfo = (info: string) => {
+    console.log(`[QuizGenerator] ${info}`);
+    setDebugInfo(prev => [...prev, info]);
+  };
 
   const handleGenerateQuiz = async () => {
     if (!url.trim()) {
@@ -28,40 +34,61 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
 
     setLoading(true);
     setError('');
+    setDebugInfo([]);
 
     try {
+      addDebugInfo(`Starting quiz generation for video ID: ${videoId}`);
+
       // Step 1: Get video info
       setCurrentStep('Fetching video information...');
+      addDebugInfo('Fetching video metadata...');
+      
       const videoInfo = await getVideoInfo(videoId);
       if (!videoInfo) {
         throw new Error('Could not fetch video information. Please check the video URL.');
       }
+      
+      addDebugInfo(`Video info retrieved: "${videoInfo.title}" by ${videoInfo.channelTitle}`);
 
       // Step 2: Get transcript
       setCurrentStep('Extracting video captions...');
+      addDebugInfo('Attempting to extract transcript/captions...');
+      
       const transcript = await getTranscript(videoId);
       if (!transcript) {
         throw new Error('This video does not have captions available. Please try a video with captions or subtitles enabled.');
       }
+      
+      addDebugInfo(`Transcript extracted successfully - ${transcript.length} characters`);
 
       // Step 3: Generate quiz
       setCurrentStep('Generating personalized questions...');
+      addDebugInfo('Sending transcript to AI for quiz generation...');
+      
       const quiz = await generateQuizFromVideo(videoId, videoInfo.title, transcript, videoInfo.description);
       if (!quiz) {
         throw new Error('Failed to generate quiz questions. Please try again.');
       }
+      
+      addDebugInfo(`Quiz generated with ${quiz.questions.length} questions`);
 
       // Step 4: Save session
       setCurrentStep('Saving your learning session...');
+      addDebugInfo('Saving quiz session to database...');
+      
       const sessionId = await createQuizSession(quiz, videoInfo, transcript);
       if (!sessionId) {
         throw new Error('Failed to save quiz session. Please try again.');
       }
+      
+      addDebugInfo(`Quiz session saved with ID: ${sessionId}`);
 
       onQuizGenerated(quiz, sessionId);
     } catch (err) {
       console.error('Quiz generation error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to generate quiz. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate quiz. Please try again.';
+      setError(errorMessage);
+      addDebugInfo(`Error occurred: ${errorMessage}`);
     } finally {
       setLoading(false);
       setCurrentStep('');
@@ -108,8 +135,20 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
                       <li>Use a video with captions or subtitles enabled</li>
                       <li>Try educational content with clear speech</li>
                       <li>Check if the video is public and accessible</li>
+                      <li>Try a different video from a popular educational channel</li>
                     </ul>
                   </div>
+                  
+                  {debugInfo.length > 0 && (
+                    <details className="mt-3">
+                      <summary className="text-xs text-gray-500 cursor-pointer">Debug Information</summary>
+                      <div className="mt-2 p-2 bg-gray-100 rounded text-xs font-mono">
+                        {debugInfo.map((info, index) => (
+                          <div key={index} className="text-gray-700">{info}</div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </div>
               </div>
             </div>
@@ -142,6 +181,19 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
                 <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
                 <span className="text-sm text-gray-600">{currentStep}</span>
               </div>
+              
+              {debugInfo.length > 0 && (
+                <div className="mt-4 text-left">
+                  <details>
+                    <summary className="text-xs text-gray-500 cursor-pointer text-center">View Progress Details</summary>
+                    <div className="mt-2 p-2 bg-white/50 rounded text-xs font-mono text-left max-h-32 overflow-y-auto">
+                      {debugInfo.map((info, index) => (
+                        <div key={index} className="text-gray-700 mb-1">{info}</div>
+                      ))}
+                    </div>
+                  </details>
+                </div>
+              )}
             </div>
           </div>
         )}
