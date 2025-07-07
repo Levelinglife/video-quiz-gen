@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { extractVideoId, getVideoInfo, getTranscript } from '../services/youtubeService';
 import { generateQuizFromVideo, GeneratedQuiz } from '../services/realAiService';
@@ -37,10 +36,10 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
     setDebugInfo([]);
 
     try {
-      addDebugInfo(`Starting enhanced quiz generation for video ID: ${videoId}`);
+      addDebugInfo(`🚀 Starting comprehensive quiz generation for video ID: ${videoId}`);
 
       // Step 1: Get video info
-      setCurrentStep('Fetching video information...');
+      setCurrentStep('📹 Fetching video information...');
       addDebugInfo('Fetching video metadata from YouTube API...');
       
       const videoInfo = await getVideoInfo(videoId);
@@ -48,43 +47,43 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
         throw new Error('Could not fetch video information. Please check the video URL and try again.');
       }
       
-      addDebugInfo(`Video info retrieved: "${videoInfo.title}" by ${videoInfo.channelTitle} (${videoInfo.duration})`);
+      addDebugInfo(`✅ Video info retrieved: "${videoInfo.title}" by ${videoInfo.channelTitle} (${videoInfo.duration})`);
 
-      // Step 2: Get transcript with enhanced extraction
-      setCurrentStep('Extracting video captions using enhanced methods...');
-      addDebugInfo('Attempting to extract transcript using multiple enhanced methods...');
-      addDebugInfo('Trying: YouTube API, Direct Caption Fetch, Alternative Methods...');
+      // Step 2: Get transcript with comprehensive extraction
+      setCurrentStep('🎯 Extracting captions using advanced methods...');
+      addDebugInfo('🔍 Attempting comprehensive transcript extraction...');
+      addDebugInfo('📋 Methods: Watch Page Scraping → Direct API calls → Alternative endpoints');
       
       const transcript = await getTranscript(videoId);
       if (!transcript) {
-        throw new Error('Unable to extract transcript from this video. This could be because:\n• The video is private or restricted\n• No captions are available for this video\n• The video is too new and captions haven\'t been generated yet\n• The video content doesn\'t support automatic caption generation\n\nPlease try a different video with visible captions (CC button should be available on YouTube).');
+        throw new Error('Could not extract transcript from this video. This could be because:\n• The video doesn\'t have captions or subtitles\n• The video is in a language that isn\'t supported\n• The video is too short or doesn\'t contain speech\n• The video may be music-only or have background music that interferes with speech recognition\n\nTry using a video that has captions available or clear speech content.');
       }
       
-      addDebugInfo(`SUCCESS! Transcript extracted - ${transcript.length} characters`);
-      addDebugInfo(`Preview: "${transcript.substring(0, 150)}..."`);
+      addDebugInfo(`🎉 SUCCESS! Transcript extracted - ${transcript.length} characters`);
+      addDebugInfo(`📖 Content preview: "${transcript.substring(0, 100)}..."`);
 
       // Step 3: Generate quiz
-      setCurrentStep('Generating personalized questions...');
-      addDebugInfo('Sending transcript to AI for quiz generation...');
+      setCurrentStep('🧠 Generating personalized learning questions...');
+      addDebugInfo('🤖 Sending transcript to AI for intelligent quiz generation...');
       
       const quiz = await generateQuizFromVideo(videoId, videoInfo.title, transcript, videoInfo.description);
       if (!quiz) {
         throw new Error('Failed to generate quiz questions. The AI service may be temporarily unavailable. Please try again.');
       }
       
-      addDebugInfo(`Quiz generated successfully with ${quiz.questions.length} questions`);
+      addDebugInfo(`✨ Quiz generated successfully with ${quiz.questions.length} questions`);
 
       // Step 4: Save session
-      setCurrentStep('Saving your learning session...');
-      addDebugInfo('Saving quiz session to database...');
+      setCurrentStep('💾 Saving your learning session...');
+      addDebugInfo('📝 Saving quiz session to database...');
       
       const sessionId = await createQuizSession(quiz, videoInfo, transcript);
       if (!sessionId) {
         throw new Error('Failed to save quiz session. Please try again.');
       }
       
-      addDebugInfo(`Quiz session saved with ID: ${sessionId}`);
-      addDebugInfo('🎉 Quiz generation completed successfully!');
+      addDebugInfo(`🗃️ Quiz session saved with ID: ${sessionId}`);
+      addDebugInfo('🎊 Quiz generation completed successfully!');
 
       onQuizGenerated(quiz, sessionId);
     } catch (err) {
@@ -115,20 +114,21 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
             
             {isTranscriptError && (
               <div className="mt-3 text-sm text-gray-600">
-                <p className="font-medium">Try these suggestions:</p>
+                <p className="font-medium">💡 Try these suggestions:</p>
                 <ul className="list-disc list-inside mt-1 space-y-1">
                   <li>Make sure the video has the CC (closed captions) button visible on YouTube</li>
                   <li>Try educational content (TED Talks, Khan Academy, Coursera, etc.)</li>
                   <li>Ensure the video is public and not private/restricted</li>
                   <li>Try a different video that you know has captions</li>
                   <li>Check if the video is too new (captions may not be generated yet)</li>
+                  <li>Avoid music videos or content without clear speech</li>
                 </ul>
               </div>
             )}
             
             {debugInfo.length > 0 && (
               <details className="mt-3">
-                <summary className="text-xs text-gray-500 cursor-pointer">Show Debug Information</summary>
+                <summary className="text-xs text-gray-500 cursor-pointer">🔍 Show Technical Debug Information</summary>
                 <div className="mt-2 p-3 bg-gray-100 rounded text-xs font-mono max-h-40 overflow-y-auto">
                   {debugInfo.map((info, index) => (
                     <div key={index} className="text-gray-700 mb-1">{info}</div>
@@ -165,7 +165,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              💡 Tip: Make sure the CC (closed captions) button is visible on the YouTube video
+              💡 <strong>Best results:</strong> Use videos with clear speech and visible CC (closed captions) button
             </p>
           </div>
 
@@ -193,7 +193,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
         {loading && currentStep && (
           <div className="mt-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6">
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-700 mb-3">Creating Your Quiz</h3>
+              <h3 className="text-lg font-semibold text-gray-700 mb-3">🎯 Creating Your Quiz</h3>
               <div className="flex items-center justify-center space-x-2 mb-4">
                 <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
                 <span className="text-sm text-gray-600">{currentStep}</span>
@@ -202,7 +202,7 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
               {debugInfo.length > 0 && (
                 <div className="text-left">
                   <details>
-                    <summary className="text-xs text-gray-500 cursor-pointer text-center">View Progress Details</summary>
+                    <summary className="text-xs text-gray-500 cursor-pointer text-center">📊 View Live Progress Details</summary>
                     <div className="mt-2 p-3 bg-white/50 rounded text-xs font-mono text-left max-h-32 overflow-y-auto">
                       {debugInfo.map((info, index) => (
                         <div key={index} className="text-gray-700 mb-1">{info}</div>
