@@ -1,5 +1,3 @@
-
-import { supabase } from "@/integrations/supabase/client";
 import { GeneratedQuiz } from "./realAiService";
 
 export interface QuizSession {
@@ -29,32 +27,48 @@ export interface QuizAnswer {
   isCorrect?: boolean;
 }
 
+// Helper function to generate unique IDs
+const generateId = (): string => {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
+
+// LocalStorage keys
+const QUIZ_SESSIONS_KEY = 'quizSessions';
+const QUIZ_ANSWERS_KEY = 'quizAnswers';
+
 export const createQuizSession = async (
   quiz: GeneratedQuiz,
   videoInfo: any,
   transcript: string
 ): Promise<string | null> => {
   try {
-    const { data, error } = await supabase
-      .from('quiz_sessions')
-      .insert({
-        video_id: quiz.videoId,
-        video_title: quiz.videoTitle,
-        video_thumbnail: videoInfo.thumbnail,
-        video_duration: videoInfo.duration,
-        channel_title: videoInfo.channelTitle,
-        transcript: transcript,
-        total_questions: quiz.questions.length
-      })
-      .select('id')
-      .single();
+    const sessionId = generateId();
+    
+    const session: QuizSession = {
+      id: sessionId,
+      videoId: quiz.videoId,
+      videoTitle: quiz.videoTitle,
+      videoThumbnail: videoInfo.thumbnail,
+      videoDuration: videoInfo.duration,
+      channelTitle: videoInfo.channelTitle,
+      transcript: transcript,
+      totalQuestions: quiz.questions.length,
+      correctAnswers: 0,
+      completionPercentage: 0,
+      createdAt: new Date().toISOString()
+    };
 
-    if (error) {
-      console.error('Error creating quiz session:', error);
-      return null;
-    }
+    // Get existing sessions
+    const existingSessions = getStoredSessions();
+    
+    // Add new session
+    existingSessions.push(session);
+    
+    // Save to localStorage
+    localStorage.setItem(QUIZ_SESSIONS_KEY, JSON.stringify(existingSessions));
 
-    return data.id;
+    console.log(`Quiz session created with ID: ${sessionId}`);
+    return sessionId;
   } catch (error) {
     console.error('Error creating quiz session:', error);
     return null;
@@ -72,23 +86,28 @@ export const saveQuizAnswer = async (
   isCorrect?: boolean
 ): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from('quiz_answers')
-      .insert({
-        session_id: sessionId,
-        question_id: questionId,
-        question_text: questionText,
-        question_type: questionType,
-        question_category: questionCategory,
-        user_answer: userAnswer,
-        correct_answer: correctAnswer,
-        is_correct: isCorrect
-      });
+    const answerId = generateId();
+    
+    const answer: QuizAnswer = {
+      id: answerId,
+      sessionId,
+      questionId,
+      questionText,
+      questionType,
+      questionCategory,
+      userAnswer,
+      correctAnswer,
+      isCorrect
+    };
 
-    if (error) {
-      console.error('Error saving quiz answer:', error);
-      return false;
-    }
+    // Get existing answers
+    const existingAnswers = getStoredAnswers();
+    
+    // Add new answer
+    existingAnswers.push(answer);
+    
+    // Save to localStorage
+    localStorage.setItem(QUIZ_ANSWERS_KEY, JSON.stringify(existingAnswers));
 
     return true;
   } catch (error) {
@@ -105,21 +124,23 @@ export const updateQuizCompletion = async (
   try {
     const completionPercentage = (correctAnswers / totalQuestions) * 100;
     
-    const { error } = await supabase
-      .from('quiz_sessions')
-      .update({
-        correct_answers: correctAnswers,
-        completion_percentage: completionPercentage,
-        completed_at: new Date().toISOString()
-      })
-      .eq('id', sessionId);
-
-    if (error) {
-      console.error('Error updating quiz completion:', error);
-      return false;
+    // Get existing sessions
+    const existingSessions = getStoredSessions();
+    
+    // Find and update the session
+    const sessionIndex = existingSessions.findIndex(s => s.id === sessionId);
+    if (sessionIndex !== -1) {
+      existingSessions[sessionIndex].correctAnswers = correctAnswers;
+      existingSessions[sessionIndex].completionPercentage = completionPercentage;
+      existingSessions[sessionIndex].completedAt = new Date().toISOString();
+      
+      // Save updated sessions
+      localStorage.setItem(QUIZ_SESSIONS_KEY, JSON.stringify(existingSessions));
+      
+      return true;
     }
 
-    return true;
+    return false;
   } catch (error) {
     console.error('Error updating quiz completion:', error);
     return false;
@@ -128,32 +149,40 @@ export const updateQuizCompletion = async (
 
 export const getQuizSessions = async (): Promise<QuizSession[]> => {
   try {
-    const { data, error } = await supabase
-      .from('quiz_sessions')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching quiz sessions:', error);
-      return [];
-    }
-
-    return data.map(session => ({
-      id: session.id,
-      videoId: session.video_id,
-      videoTitle: session.video_title,
-      videoThumbnail: session.video_thumbnail,
-      videoDuration: session.video_duration,
-      channelTitle: session.channel_title,
-      transcript: session.transcript,
-      totalQuestions: session.total_questions,
-      correctAnswers: session.correct_answers,
-      completionPercentage: session.completion_percentage,
-      completedAt: session.completed_at,
-      createdAt: session.created_at
-    }));
+    const sessions = getStoredSessions();
+    
+    // Sort by creation date (newest first)
+    return sessions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (error) {
     console.error('Error fetching quiz sessions:', error);
     return [];
   }
+};
+
+// Helper functions for localStorage operations
+function getStoredSessions(): QuizSession[] {
+  try {
+    const stored = localStorage.getItem(QUIZ_SESSIONS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Error parsing stored sessions:', error);
+    return [];
+  }
+}
+
+function getStoredAnswers(): QuizAnswer[] {
+  try {
+    const stored = localStorage.getItem(QUIZ_ANSWERS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Error parsing stored answers:', error);
+    return [];
+  }
+}
+
+// Optional: Clear all data (for debugging)
+export const clearAllData = (): void => {
+  localStorage.removeItem(QUIZ_SESSIONS_KEY);
+  localStorage.removeItem(QUIZ_ANSWERS_KEY);
+  console.log('All quiz data cleared from localStorage');
 };
