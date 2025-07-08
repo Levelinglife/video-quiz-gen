@@ -13,8 +13,39 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log(`Request method: ${req.method}`);
+  console.log(`Request headers:`, Object.fromEntries(req.headers.entries()));
+
+  let body;
   try {
-    const { videoId } = await req.json();
+    const rawBody = await req.text();
+    console.log(`Raw request body: ${rawBody}`);
+    
+    if (!rawBody || rawBody.trim() === '') {
+      console.log('Empty request body received');
+      return new Response(JSON.stringify({ 
+        error: 'Empty request body',
+        message: 'Request body is required and must contain videoId'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    body = JSON.parse(rawBody);
+    console.log(`Parsed request body:`, body);
+  } catch (parseError) {
+    console.error('JSON parsing error:', parseError);
+    return new Response(JSON.stringify({ 
+      error: 'Invalid JSON in request body',
+      message: 'Request body must be valid JSON with videoId field'
+    }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const { videoId } = body || {};
     
     if (!videoId) {
       console.log('No video ID provided');
