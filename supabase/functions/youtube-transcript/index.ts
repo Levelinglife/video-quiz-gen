@@ -47,6 +47,7 @@ serve(async (req) => {
 
   const { videoId } = body || {};
     
+  try {
     if (!videoId) {
       console.log('No video ID provided');
       return new Response(JSON.stringify({ 
