@@ -180,6 +180,29 @@ function getStoredAnswers(): QuizAnswer[] {
   }
 }
 
+export const getQuizSession = async (sessionId: string): Promise<QuizSession | null> => {
+  try {
+    const sessions = await getQuizSessions();
+    return sessions.find(session => session.id === sessionId) || null;
+  } catch (error) {
+    console.error('Error fetching quiz session:', error);
+    return null;
+  }
+};
+
+export const getQuizAnswers = async (sessionId: string): Promise<QuizAnswer[]> => {
+  try {
+    const storedAnswers = localStorage.getItem(QUIZ_ANSWERS_KEY);
+    if (!storedAnswers) return [];
+    
+    const allAnswers: QuizAnswer[] = JSON.parse(storedAnswers);
+    return allAnswers.filter(answer => answer.sessionId === sessionId);
+  } catch (error) {
+    console.error('Error fetching quiz answers:', error);
+    return [];
+  }
+};
+
 // Optional: Clear all data (for debugging)
 export const clearAllData = (): void => {
   localStorage.removeItem(QUIZ_SESSIONS_KEY);

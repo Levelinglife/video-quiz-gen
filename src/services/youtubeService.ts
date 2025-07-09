@@ -87,16 +87,43 @@ function parseDuration(duration: string): string {
 
 export const getTranscript = async (videoId: string): Promise<string | null> => {
   try {
-    console.log(`Creating mock transcript for video: ${videoId}`);
+    console.log(`Fetching real transcript for video: ${videoId}`);
     
-    // Create a mock transcript for offline usage
+    // Try to get real transcript from Supabase Edge Function first
+    try {
+      const supabaseUrl = 'https://evgsgqgrytnzrffckmqg.supabase.co/functions/v1/youtube-transcript';
+      
+      const response = await fetch(supabaseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ videoId })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.transcript && data.transcript.length > 100) {
+          console.log(`Real transcript fetched successfully! Length: ${data.transcript.length} characters`);
+          return data.transcript;
+        }
+      } else {
+        console.log('Supabase transcript extraction failed, using fallback');
+      }
+    } catch (supabaseError) {
+      console.log('Supabase Edge Function error:', supabaseError);
+    }
+    
+    // Fallback to mock transcript if real extraction fails
+    console.log(`Creating mock transcript for video: ${videoId}`);
     const mockTranscript = `This is a sample transcript for video ${videoId}. In this educational video, we discuss various important topics including learning techniques, knowledge retention, and practical applications. The content covers fundamental concepts that are essential for understanding the subject matter. We explore different perspectives and provide comprehensive explanations to ensure thorough comprehension. The discussion includes real-world examples and case studies that demonstrate the practical implementation of these concepts. Throughout the presentation, we emphasize the importance of critical thinking and analytical skills. The material is designed to engage learners and promote active participation in the learning process. We also cover best practices and common pitfalls to avoid when applying these concepts in practice.`;
     
     console.log(`Mock transcript created successfully! Length: ${mockTranscript.length} characters`);
     return mockTranscript;
     
   } catch (error) {
-    console.error('Error creating transcript:', error);
+    console.error('Error getting transcript:', error);
     throw error;
   }
 };

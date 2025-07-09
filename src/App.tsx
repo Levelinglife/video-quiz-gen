@@ -5,12 +5,14 @@ import Header from './components/Header';
 import QuizGenerator from './components/QuizGenerator';
 import InteractiveQuiz from './components/InteractiveQuiz';
 import Dashboard from './components/Dashboard';
+import QuizViewer from './components/QuizViewer';
 import { GeneratedQuiz } from './services/realAiService';
 
 function App() {
   const [currentQuiz, setCurrentQuiz] = useState<GeneratedQuiz | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
 
   const handleQuizGenerated = (quiz: GeneratedQuiz, sessionId: string) => {
     setCurrentQuiz(quiz);
@@ -26,6 +28,12 @@ function App() {
     setCurrentQuiz(null);
     setCurrentSessionId(null);
     setShowDashboard(false);
+    setViewingSessionId(null);
+  };
+
+  const handleViewQuiz = (sessionId: string) => {
+    setViewingSessionId(sessionId);
+    setShowDashboard(false);
   };
 
   return (
@@ -38,7 +46,15 @@ function App() {
             <Route path="/" element={
               <>
                 {showDashboard ? (
-                  <Dashboard onBackToGenerator={handleBackToGenerator} />
+                  <Dashboard 
+                    onBackToGenerator={handleBackToGenerator}
+                    onViewQuiz={handleViewQuiz}
+                  />
+                ) : viewingSessionId ? (
+                  <QuizViewer 
+                    sessionId={viewingSessionId}
+                    onBackToDashboard={() => setShowDashboard(true)}
+                  />
                 ) : currentQuiz && currentSessionId ? (
                   <InteractiveQuiz 
                     quiz={currentQuiz} 
@@ -61,7 +77,7 @@ function App() {
                 )}
               </>
             } />
-            <Route path="/dashboard" element={<Dashboard onBackToGenerator={handleBackToGenerator} />} />
+            <Route path="/dashboard" element={<Dashboard onBackToGenerator={handleBackToGenerator} onViewQuiz={handleViewQuiz} />} />
           </Routes>
         </main>
       </div>

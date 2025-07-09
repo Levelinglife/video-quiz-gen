@@ -229,20 +229,53 @@ export const generateQuizFromVideo = async (
 
 // Create video summary for dashboard viewing
 const createVideoSummary = (videoTitle: string, transcript: string) => {
-  const sentences = transcript.split('.').filter(s => s.trim().length > 20);
-  const keySentences = sentences.slice(0, 3).join('. ') + '.';
+  // Extract meaningful content from transcript
+  const sentences = transcript.split(/[.!?]+/).filter(s => s.trim().length > 20);
+  const meaningfulSentences = sentences.slice(0, 5);
+  
+  // Generate key insights based on transcript content
+  const words = transcript.toLowerCase().split(/\s+/);
+  const keyTerms = [...new Set(words.filter(word => word.length > 5))].slice(0, 10);
+  
+  // Create contextual key points based on actual content
+  const keyPoints = [];
+  if (transcript.includes('step') || transcript.includes('process') || transcript.includes('method')) {
+    keyPoints.push("Step-by-step methodology and systematic approach");
+  }
+  if (transcript.includes('example') || transcript.includes('case') || transcript.includes('practice')) {
+    keyPoints.push("Practical examples and real-world applications");
+  }
+  if (transcript.includes('learn') || transcript.includes('understand') || transcript.includes('concept')) {
+    keyPoints.push("Core learning concepts and knowledge framework");
+  }
+  if (transcript.includes('skill') || transcript.includes('technique') || transcript.includes('strategy')) {
+    keyPoints.push("Key skills and strategic techniques covered");
+  }
+  
+  // Default points if none detected
+  if (keyPoints.length === 0) {
+    keyPoints.push(
+      "Main concepts and learning objectives from the video",
+      "Practical insights and actionable takeaways",
+      "Key knowledge areas and skill development focus"
+    );
+  }
+  
+  const summary = meaningfulSentences.length > 0 
+    ? meaningfulSentences.join('. ') + '.'
+    : `This video covers important topics related to ${videoTitle.toLowerCase()}. The content provides valuable insights and practical knowledge that can be applied in real-world scenarios.`;
   
   return {
     title: videoTitle,
-    keyPoints: [
-      "Main concepts and learning objectives covered",
-      "Practical applications and real-world examples", 
-      "Step-by-step methodology or approach explained",
-      "Key takeaways and actionable insights"
-    ],
-    summary: keySentences,
+    keyPoints: keyPoints.slice(0, 4),
+    summary: summary,
     duration: "10-15 minutes",
-    difficulty: "Intermediate",
-    tags: ["Educational", "Skill Development", "Learning"]
+    difficulty: transcript.includes('advanced') || transcript.includes('complex') ? "Advanced" : 
+               transcript.includes('basic') || transcript.includes('introduction') ? "Beginner" : "Intermediate",
+    tags: [
+      "Educational", 
+      "Skill Development",
+      ...keyTerms.slice(0, 3).map(term => term.charAt(0).toUpperCase() + term.slice(1))
+    ].slice(0, 5)
   };
 };

@@ -5,9 +5,10 @@ import { getQuizSessions, QuizSession } from '../services/quizDatabase';
 
 interface DashboardProps {
   onBackToGenerator: () => void;
+  onViewQuiz?: (sessionId: string) => void;
 }
 
-const Dashboard = ({ onBackToGenerator }: DashboardProps) => {
+const Dashboard = ({ onBackToGenerator, onViewQuiz }: DashboardProps) => {
   const [quizSessions, setQuizSessions] = useState<QuizSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<QuizSession | null>(null);
@@ -51,6 +52,12 @@ const Dashboard = ({ onBackToGenerator }: DashboardProps) => {
   const handleViewSummary = (session: QuizSession) => {
     setSelectedSession(session);
     setShowSummary(true);
+  };
+
+  const handleViewQuiz = (session: QuizSession) => {
+    if (onViewQuiz) {
+      onViewQuiz(session.id);
+    }
   };
 
   const closeSummary = () => {
@@ -210,9 +217,9 @@ const Dashboard = ({ onBackToGenerator }: DashboardProps) => {
                             <FileText className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleViewSummary(session)}
+                            onClick={() => handleViewQuiz(session)}
                             className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="View Assessment"
+                            title="View Quiz"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
