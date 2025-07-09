@@ -25,16 +25,40 @@ export const extractVideoId = (url: string): string | null => {
 
 export const getVideoInfo = async (videoId: string): Promise<VideoInfo | null> => {
   try {
-    console.log(`Creating video info for: ${videoId}`);
+    console.log(`Fetching video info for: ${videoId}`);
     
-    // Create mock video info since we're working offline
+    // Try to get real video title using YouTube oEmbed API (no API key required)
+    try {
+      const oEmbedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+      const response = await fetch(oEmbedUrl);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Video info fetched successfully:', data.title);
+        
+        return {
+          id: videoId,
+          title: data.title || `Video ${videoId}`,
+          description: 'Educational video content for quiz generation',
+          thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+          duration: '10:00',
+          channelTitle: data.author_name || 'YouTube Channel',
+          publishedAt: new Date().toISOString(),
+          viewCount: '1000'
+        };
+      }
+    } catch (oembedError) {
+      console.log('oEmbed failed, using fallback:', oembedError);
+    }
+    
+    // Fallback to mock data if oEmbed fails
     const videoInfo = {
       id: videoId,
-      title: `Video ${videoId}`,
-      description: 'This video will be used for quiz generation',
+      title: `Educational Video ${videoId.substring(0, 6)}`,
+      description: 'Educational video content for quiz generation',
       thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
       duration: '10:00',
-      channelTitle: 'YouTube Channel',
+      channelTitle: 'Educational Channel',
       publishedAt: new Date().toISOString(),
       viewCount: '1000'
     };

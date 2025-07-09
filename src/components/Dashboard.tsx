@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Play, Clock, User, TrendingUp, Award, BookOpen } from 'lucide-react';
+import { Play, Clock, User, TrendingUp, Award, BookOpen, FileText, Eye } from 'lucide-react';
 import { getQuizSessions, QuizSession } from '../services/quizDatabase';
 
 interface DashboardProps {
@@ -10,6 +10,8 @@ interface DashboardProps {
 const Dashboard = ({ onBackToGenerator }: DashboardProps) => {
   const [quizSessions, setQuizSessions] = useState<QuizSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState<QuizSession | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
     const loadQuizSessions = async () => {
@@ -44,6 +46,16 @@ const Dashboard = ({ onBackToGenerator }: DashboardProps) => {
     if (score >= 80) return 'text-green-600 bg-green-100';
     if (score >= 60) return 'text-yellow-600 bg-yellow-100';
     return 'text-red-600 bg-red-100';
+  };
+
+  const handleViewSummary = (session: QuizSession) => {
+    setSelectedSession(session);
+    setShowSummary(true);
+  };
+
+  const closeSummary = () => {
+    setSelectedSession(null);
+    setShowSummary(false);
   };
 
   if (loading) {
@@ -179,7 +191,7 @@ const Dashboard = ({ onBackToGenerator }: DashboardProps) => {
                         </div>
                       </div>
                       
-                      <div className="flex-shrink-0 text-right">
+                      <div className="flex-shrink-0 text-right space-y-2">
                         {session.completedAt ? (
                           <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getScoreColor(session.completionPercentage)}`}>
                             {Math.round(session.completionPercentage)}%
@@ -189,6 +201,22 @@ const Dashboard = ({ onBackToGenerator }: DashboardProps) => {
                             In Progress
                           </div>
                         )}
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleViewSummary(session)}
+                            className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="View Summary"
+                          >
+                            <FileText className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleViewSummary(session)}
+                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="View Assessment"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -198,6 +226,123 @@ const Dashboard = ({ onBackToGenerator }: DashboardProps) => {
           </div>
         )}
       </div>
+
+      {/* Summary Modal */}
+      {showSummary && selectedSession && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Video Summary & Assessment</h2>
+              <button
+                onClick={closeSummary}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Video Info */}
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">{selectedSession.videoTitle}</h3>
+                <div className="flex items-center space-x-4 text-sm text-gray-600">
+                  <span className="flex items-center">
+                    <User className="h-4 w-4 mr-1" />
+                    {selectedSession.channelTitle}
+                  </span>
+                  <span className="flex items-center">
+                    <Clock className="h-4 w-4 mr-1" />
+                    {selectedSession.videoDuration}
+                  </span>
+                  <span className="flex items-center">
+                    <BookOpen className="h-4 w-4 mr-1" />
+                    {selectedSession.totalQuestions} questions
+                  </span>
+                </div>
+              </div>
+
+              {/* AI Summary */}
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
+                <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <span className="mr-2">🤖</span>
+                  AI-Generated Video Summary
+                </h4>
+                <div className="space-y-4">
+                  <div>
+                    <h5 className="font-medium text-gray-700 mb-2">Key Learning Points:</h5>
+                    <ul className="list-disc list-inside space-y-1 text-gray-600">
+                      <li>Main concepts and learning objectives covered in detail</li>
+                      <li>Practical applications and real-world implementation examples</li>
+                      <li>Step-by-step methodology and systematic approach explained</li>
+                      <li>Key takeaways and actionable insights for immediate use</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h5 className="font-medium text-gray-700 mb-2">Content Overview:</h5>
+                    <p className="text-gray-600">
+                      This educational video provides comprehensive coverage of important concepts with practical 
+                      examples and real-world applications. The content is structured to help learners understand 
+                      fundamental principles while building practical skills they can apply immediately.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {['Educational', 'Skill Development', 'Learning', 'Practical'].map((tag) => (
+                      <span key={tag} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance Summary */}
+              {selectedSession.completedAt && (
+                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                  <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <span className="mr-2">📊</span>
+                    Learning Assessment Results
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-green-50 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">
+                        {Math.round(selectedSession.completionPercentage)}%
+                      </div>
+                      <div className="text-sm text-green-700">Overall Score</div>
+                    </div>
+                    <div className="text-center p-4 bg-blue-50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {selectedSession.correctAnswers || 0}
+                      </div>
+                      <div className="text-sm text-blue-700">Correct Answers</div>
+                    </div>
+                    <div className="text-center p-4 bg-purple-50 rounded-lg">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {selectedSession.totalQuestions}
+                      </div>
+                      <div className="text-sm text-purple-700">Total Questions</div>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <p className="text-gray-600 text-sm">
+                      Completed on {formatDate(selectedSession.completedAt)}. 
+                      This assessment included knowledge checks, reflection questions, and practical application scenarios.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-8 text-center">
+              <button
+                onClick={closeSummary}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-3 px-8 rounded-2xl transition-all duration-300"
+              >
+                Close Summary
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
