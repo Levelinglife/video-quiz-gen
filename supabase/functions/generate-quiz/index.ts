@@ -20,13 +20,37 @@ serve(async (req) => {
       throw new Error('Google API key not configured');
     }
 
-    const prompt = `Based on the YouTube video titled "${videoTitle}" with the following transcript and description, generate a comprehensive learning quiz with exactly 8 questions.
+    const prompt = `You are an instructional designer specializing in educational psychology and Bloom's Taxonomy.
 
+**Task:**  
+Given the transcript of an informative video, generate exactly **10 quiz questions**:
+- 8 **MCQs** (with 4 options each, one correct answer)  
+- 2 **open-response** questions requiring a long-form answer
+
+Video Title: ${videoTitle}
 Video Description: ${videoDescription || 'Not provided'}
-
 Transcript: ${transcript}
 
-Generate questions in this exact format - return ONLY valid JSON:
+Distribute questions across Bloom's revised cognitive levels:
+
+**MCQs:**
+1. **Remember** – 2 questions (factual recall from the video content)
+2. **Understand** – 2 questions (comprehension of key concepts)
+3. **Apply / Analyze** – 2 questions (practical use or analysis of content)
+4. **Evaluate** – 2 questions (judgment or critique based on video)
+
+**Open-response (long answer):**
+5. **Analyze / Evaluate** – 1 question (deep analysis or evaluation)
+6. **Create** – 1 question (design or synthesis)
+
+**CRITICAL REQUIREMENTS:**
+- All questions MUST be based on actual content from the transcript
+- Use specific details, facts, and concepts mentioned in the video
+- Avoid generic questions that could apply to any video
+- MCQ options should include plausible distractors based on video content
+- Questions should demonstrate you've analyzed the specific video content
+
+**Format your output** exactly as follows JSON:
 
 {
   "questions": [
@@ -34,27 +58,25 @@ Generate questions in this exact format - return ONLY valid JSON:
       "id": 1,
       "type": "multiple-choice",
       "category": "comprehension",
-      "question": "Question text here",
-      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
+      "question": "[Specific question based on video content]",
+      "options": ["A) Option based on video", "B) Option based on video", "C) Option based on video", "D) Option based on video"],
       "correctAnswer": "A"
     },
     {
-      "id": 2,
+      "id": 10,
       "type": "open-ended",
-      "category": "reflection",
-      "question": "Reflective question here"
+      "category": "application", 
+      "question": "[Creative synthesis question based on video concepts]"
     }
   ]
 }
 
-Requirements:
-- Exactly 8 questions total
-- Mix of question types: 4 multiple-choice, 4 open-ended
-- Categories: 2 comprehension, 2 reflection, 2 application, 2 goal-setting
-- Multiple-choice questions must have 4 options (A, B, C, D) and specify correctAnswer
-- Open-ended questions should encourage deep thinking and personal application
-- Questions should be based on the actual content from the transcript
-- Focus on key concepts, practical applications, and personal growth opportunities`;
+**Instructions:**  
+- Return ONLY valid JSON with the questions array
+- Ensure each question clearly aligns with its Bloom's level  
+- Keep MCQs concise and focused on video content
+- Make open-response prompts specific to the video's teachings
+- Quality over generic: Every question should prove you understood THIS specific video`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${googleApiKey}`, {
       method: 'POST',

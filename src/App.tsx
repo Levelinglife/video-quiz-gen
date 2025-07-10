@@ -6,12 +6,14 @@ import QuizGenerator from './components/QuizGenerator';
 import InteractiveQuiz from './components/InteractiveQuiz';
 import Dashboard from './components/Dashboard';
 import QuizViewer from './components/QuizViewer';
+import UserProgress from './components/UserProgress';
 import { GeneratedQuiz } from './services/realAiService';
 
 function App() {
   const [currentQuiz, setCurrentQuiz] = useState<GeneratedQuiz | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showUserProgress, setShowUserProgress] = useState(false);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
 
   const handleQuizGenerated = (quiz: GeneratedQuiz, sessionId: string) => {
@@ -28,12 +30,25 @@ function App() {
     setCurrentQuiz(null);
     setCurrentSessionId(null);
     setShowDashboard(false);
+    setShowUserProgress(false);
     setViewingSessionId(null);
   };
 
   const handleViewQuiz = (sessionId: string) => {
     setViewingSessionId(sessionId);
     setShowDashboard(false);
+    setShowUserProgress(false);
+  };
+
+  const handleShowUserProgress = () => {
+    setShowUserProgress(true);
+    setShowDashboard(false);
+  };
+
+  const handleBackToDashboard = () => {
+    setShowDashboard(true);
+    setShowUserProgress(false);
+    setViewingSessionId(null);
   };
 
   return (
@@ -45,15 +60,21 @@ function App() {
           <Routes>
             <Route path="/" element={
               <>
-                {showDashboard ? (
+                {showUserProgress ? (
+                  <UserProgress 
+                    onBackToDashboard={handleBackToDashboard}
+                    onViewQuiz={handleViewQuiz}
+                  />
+                ) : showDashboard ? (
                   <Dashboard 
                     onBackToGenerator={handleBackToGenerator}
                     onViewQuiz={handleViewQuiz}
+                    onShowUserProgress={handleShowUserProgress}
                   />
                 ) : viewingSessionId ? (
                   <QuizViewer 
                     sessionId={viewingSessionId}
-                    onBackToDashboard={() => setShowDashboard(true)}
+                    onBackToDashboard={handleBackToDashboard}
                   />
                 ) : currentQuiz && currentSessionId ? (
                   <InteractiveQuiz 
@@ -77,7 +98,8 @@ function App() {
                 )}
               </>
             } />
-            <Route path="/dashboard" element={<Dashboard onBackToGenerator={handleBackToGenerator} onViewQuiz={handleViewQuiz} />} />
+            <Route path="/dashboard" element={<Dashboard onBackToGenerator={handleBackToGenerator} onViewQuiz={handleViewQuiz} onShowUserProgress={handleShowUserProgress} />} />
+            <Route path="/progress" element={<UserProgress onBackToDashboard={handleBackToDashboard} onViewQuiz={handleViewQuiz} />} />
           </Routes>
         </main>
       </div>

@@ -6,9 +6,10 @@ import { getQuizSessions, QuizSession } from '../services/quizDatabase';
 interface DashboardProps {
   onBackToGenerator: () => void;
   onViewQuiz?: (sessionId: string) => void;
+  onShowUserProgress?: () => void;
 }
 
-const Dashboard = ({ onBackToGenerator, onViewQuiz }: DashboardProps) => {
+const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: DashboardProps) => {
   const [quizSessions, setQuizSessions] = useState<QuizSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<QuizSession | null>(null);
@@ -83,12 +84,22 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz }: DashboardProps) => {
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Learning Dashboard</h1>
           <p className="text-gray-600">Track your progress and learning achievements</p>
         </div>
-        <button
-          onClick={onBackToGenerator}
-          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
-        >
-          Create New Quiz
-        </button>
+        <div className="flex space-x-3">
+          {onShowUserProgress && (
+            <button
+              onClick={onShowUserProgress}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+            >
+              View Progress
+            </button>
+          )}
+          <button
+            onClick={onBackToGenerator}
+            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+          >
+            Create New Quiz
+          </button>
+        </div>
       </div>
 
       {/* Stats Overview */}
