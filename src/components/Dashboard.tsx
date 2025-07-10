@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Play, Clock, User, TrendingUp, Award, BookOpen, FileText, Eye } from 'lucide-react';
 import { getQuizSessions, QuizSession } from '../services/quizDatabase';
+import { generateVideoSummary } from '../services/aiSummaryService';
 
 interface DashboardProps {
   onBackToGenerator: () => void;
@@ -14,6 +15,8 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<QuizSession | null>(null);
   const [showSummary, setShowSummary] = useState(false);
+  const [aiSummary, setAiSummary] = useState<any>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   useEffect(() => {
     const loadQuizSessions = async () => {
@@ -37,7 +40,15 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
   const totalCorrectAnswers = quizSessions.reduce((acc, session) => acc + (session.correctAnswers || 0), 0);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays <= 7) return `${diffDays} days ago`;
+    
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
@@ -50,9 +61,21 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
     return 'text-red-600 bg-red-100';
   };
 
-  const handleViewSummary = (session: QuizSession) => {
+  const handleViewSummary = async (session: QuizSession) => {
     setSelectedSession(session);
     setShowSummary(true);
+    setSummaryLoading(true);
+    
+    try {
+      if (session.transcript) {
+        const summary = await generateVideoSummary(session.transcript, session.videoTitle);
+        setAiSummary(summary);
+      }
+    } catch (error) {
+      console.error('Failed to generate summary:', error);
+    } finally {
+      setSummaryLoading(false);
+    }
   };
 
   const handleViewQuiz = (session: QuizSession) => {
@@ -64,6 +87,8 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
   const closeSummary = () => {
     setSelectedSession(null);
     setShowSummary(false);
+    setAiSummary(null);
+    setSummaryLoading(false);
   };
 
   if (loading) {
@@ -147,7 +172,11 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
             </div>
             <div>
               <p className="text-gray-600 text-sm">Hours Learned</p>
-              <p className="text-2xl font-bold text-gray-900">{Math.round(totalQuizzes * 0.5)}</p>
+              <p className="text-2xl font-bold text-gray-900">{Math.round(quizSessions.reduce((acc, session) => {
+                const duration = session.videoDuration || '0:00';
+                const minutes = duration.split(':').reduce((mins, time, i) => mins + parseInt(time) * Math.pow(60, duration.split(':').length - 1 - i), 0);
+                return acc + minutes;
+              }, 0) / 60 * 100) / 100}</p>
             </div>
           </div>
         </div>
@@ -187,7 +216,10 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 text-lg mb-1 truncate">
+                        <h3 
+                          className="font-semibold text-gray-900 text-lg mb-1 truncate cursor-pointer hover:text-purple-600 transition-colors"
+                          onClick={() => handleViewQuiz(session)}
+                        >
                           {session.videoTitle}
                         </h3>
                         {session.channelTitle && (
@@ -205,7 +237,9 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
                             <BookOpen className="h-4 w-4 mr-1" />
                             {session.totalQuestions} questions
                           </span>
-                          <span>{formatDate(session.createdAt)}</span>
+                          <span title={new Date(session.createdAt).toLocaleString()}>
+                            {formatDate(session.createdAt)}
+                          </span>
                         </div>
                       </div>
                       
@@ -248,14 +282,17 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
       {/* Summary Modal */}
       {showSummary && selectedSession && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl p-8 max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-start mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Video Summary & Assessment</h2>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                Video Summary & Assessment
+              </h2>
               <button
                 onClick={closeSummary}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
+                className="text-gray-400 hover:text-gray-600 text-3xl font-bold transition-colors rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-100"
+                title="Close"
               >
-                ×
+                ✕
               </button>
             </div>
 
@@ -285,32 +322,47 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
                   <span className="mr-2">🤖</span>
                   AI-Generated Video Summary
                 </h4>
-                <div className="space-y-4">
-                  <div>
-                    <h5 className="font-medium text-gray-700 mb-2">Key Learning Points:</h5>
-                    <ul className="list-disc list-inside space-y-1 text-gray-600">
-                      <li>Main concepts and learning objectives covered in detail</li>
-                      <li>Practical applications and real-world implementation examples</li>
-                      <li>Step-by-step methodology and systematic approach explained</li>
-                      <li>Key takeaways and actionable insights for immediate use</li>
-                    </ul>
+                {summaryLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Generating AI summary...</p>
                   </div>
-                  <div>
-                    <h5 className="font-medium text-gray-700 mb-2">Content Overview:</h5>
-                    <p className="text-gray-600">
-                      This educational video provides comprehensive coverage of important concepts with practical 
-                      examples and real-world applications. The content is structured to help learners understand 
-                      fundamental principles while building practical skills they can apply immediately.
-                    </p>
+                ) : aiSummary ? (
+                  <div className="space-y-4">
+                    <div>
+                      <h5 className="font-medium text-gray-700 mb-2">Key Learning Points:</h5>
+                      <ul className="list-disc list-inside space-y-1 text-gray-600">
+                        {aiSummary.keyPoints.map((point: string, index: number) => (
+                          <li key={index}>{point}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-gray-700 mb-2">Content Overview:</h5>
+                      <p className="text-gray-600">{aiSummary.overview}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      {aiSummary.tags.map((tag: string) => (
+                        <span key={tag} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    {['Educational', 'Skill Development', 'Learning', 'Practical'].map((tag) => (
-                      <span key={tag} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                        {tag}
-                      </span>
-                    ))}
+                ) : selectedSession.transcript ? (
+                  <div className="space-y-4">
+                    <div>
+                      <h5 className="font-medium text-gray-700 mb-2">Content Overview:</h5>
+                      <p className="text-gray-600">
+                        {selectedSession.transcript.substring(0, 300)}...
+                      </p>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="text-gray-500 text-center py-4">
+                    <p>No transcript available for AI summary generation.</p>
+                  </div>
+                )}
               </div>
 
               {/* Performance Summary */}
@@ -350,12 +402,18 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
               )}
             </div>
 
-            <div className="mt-8 text-center">
+            <div className="mt-8 flex justify-center space-x-4">
+              <button
+                onClick={() => handleViewQuiz(selectedSession)}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-8 rounded-2xl transition-all duration-300"
+              >
+                View Detailed Quiz
+              </button>
               <button
                 onClick={closeSummary}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-3 px-8 rounded-2xl transition-all duration-300"
+                className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-2xl transition-all duration-300"
               >
-                Close Summary
+                ✕ Close
               </button>
             </div>
           </div>
