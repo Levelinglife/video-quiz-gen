@@ -43,10 +43,16 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
     const date = new Date(dateString);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+    const diffMinutes = Math.floor(diffTime / (1000 * 60));
     
+    if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays <= 7) return `${diffDays} days ago`;
+    if (diffDays <= 30) return `${Math.floor(diffDays / 7)} weeks ago`;
     
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -62,6 +68,7 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
   };
 
   const handleViewSummary = async (session: QuizSession) => {
+    console.log('Handle View Summary clicked:', session.id);
     setSelectedSession(session);
     setShowSummary(true);
     setSummaryLoading(true);
@@ -79,8 +86,16 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
   };
 
   const handleViewQuiz = (session: QuizSession) => {
+    console.log('Handle View Quiz clicked:', session.id);
     if (onViewQuiz) {
       onViewQuiz(session.id);
+    }
+  };
+
+  const handleShowProgress = () => {
+    console.log('Handle Show Progress clicked');
+    if (onShowUserProgress) {
+      onShowUserProgress();
     }
   };
 
@@ -112,10 +127,11 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
         <div className="flex space-x-3">
           {onShowUserProgress && (
             <button
-              onClick={onShowUserProgress}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+              onClick={handleShowProgress}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1 flex items-center space-x-2"
             >
-              View Progress
+              <TrendingUp className="h-5 w-5" />
+              <span>View Progress</span>
             </button>
           )}
           <button
@@ -172,11 +188,25 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
             </div>
             <div>
               <p className="text-gray-600 text-sm">Hours Learned</p>
-              <p className="text-2xl font-bold text-gray-900">{Math.round(quizSessions.reduce((acc, session) => {
-                const duration = session.videoDuration || '0:00';
-                const minutes = duration.split(':').reduce((mins, time, i) => mins + parseInt(time) * Math.pow(60, duration.split(':').length - 1 - i), 0);
-                return acc + minutes;
-              }, 0) / 60 * 100) / 100}</p>
+              <p className="text-2xl font-bold text-gray-900">{
+                Math.round(quizSessions.reduce((acc, session) => {
+                  if (!session.videoDuration) return acc;
+                  
+                  // Parse duration properly (format: MM:SS or HH:MM:SS)
+                  const parts = session.videoDuration.split(':');
+                  let totalMinutes = 0;
+                  
+                  if (parts.length === 2) {
+                    // MM:SS format
+                    totalMinutes = parseInt(parts[0]) + parseInt(parts[1]) / 60;
+                  } else if (parts.length === 3) {
+                    // HH:MM:SS format
+                    totalMinutes = parseInt(parts[0]) * 60 + parseInt(parts[1]) + parseInt(parts[2]) / 60;
+                  }
+                  
+                  return acc + totalMinutes;
+                }, 0) / 60 * 10) / 10
+              }</p>
             </div>
           </div>
         </div>
@@ -216,9 +246,12 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h3 
+                         <h3 
                           className="font-semibold text-gray-900 text-lg mb-1 truncate cursor-pointer hover:text-purple-600 transition-colors"
-                          onClick={() => handleViewQuiz(session)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleViewQuiz(session);
+                          }}
                         >
                           {session.videoTitle}
                         </h3>
@@ -253,18 +286,26 @@ const Dashboard = ({ onBackToGenerator, onViewQuiz, onShowUserProgress }: Dashbo
                             In Progress
                           </div>
                         )}
-                        <div className="flex space-x-2">
+                         <div className="flex space-x-2">
                           <button
-                            onClick={() => handleViewSummary(session)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleViewSummary(session);
+                            }}
                             className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                            title="View Summary"
+                            title="View AI Summary"
                           >
                             <FileText className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleViewQuiz(session)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleViewQuiz(session);
+                            }}
                             className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="View Quiz"
+                            title="View Quiz Details"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
