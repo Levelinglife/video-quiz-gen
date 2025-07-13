@@ -158,71 +158,53 @@ export const generateQuizFromVideo = async (
   videoDescription?: string
 ): Promise<GeneratedQuiz | null> => {
   try {
-    console.log('Generating enhanced quiz from transcript...');
+    console.log('Generating AI quiz from transcript...');
     
-    // Analyze video content for better contextualization
-    const contentType = analyzeVideoContent(videoTitle, transcript);
-    console.log(`Detected content type: ${contentType}`);
+    // Call the AI edge function to generate questions
+    const { supabase } = await import('@/integrations/supabase/client');
     
-    // Generate contextual questions based on content type
-    const contextualQuestions = generateContextualQuestions(videoTitle, transcript, contentType);
+    const { data, error } = await supabase.functions.invoke('generate-quiz', {
+      body: {
+        videoTitle,
+        transcript,
+        videoDescription
+      }
+    });
+
+    if (error) {
+      console.error('Error calling generate-quiz function:', error);
+      throw new Error(`AI quiz generation failed: ${error.message}`);
+    }
+
+    if (!data || !data.questions) {
+      console.error('Invalid response from generate-quiz function:', data);
+      throw new Error('AI returned invalid quiz format');
+    }
+
+    console.log(`AI generated ${data.questions.length} questions successfully`);
     
+    // Transform AI response to match our interface
+    const transformedQuestions: Question[] = data.questions.map((q: any) => ({
+      id: q.id,
+      type: q.type,
+      category: q.category || 'comprehension',
+      question: q.question,
+      options: q.options,
+      correctAnswer: q.correctAnswer
+    }));
+
     // Create video summary for dashboard
     const videoSummary = createVideoSummary(videoTitle, transcript);
-    
-    const allQuestions = [
-      ...contextualQuestions,
-      {
-        id: 2,
-        type: 'open-ended' as const,
-        category: 'reflection' as const,
-        question: `Why did you choose to watch this specific video? What were you hoping to learn or achieve?`
-      },
-      {
-        id: 4,
-        type: 'open-ended' as const,
-        category: 'reflection' as const,
-        question: `What are the key insights from this video that resonate most with your current situation or goals?`
-      },
-      {
-        id: 5,
-        type: 'open-ended' as const,
-        category: 'application' as const,
-        question: `Describe a specific real-world scenario where you could apply what you've learned from this video.`
-      },
-      {
-        id: 6,
-        type: 'multiple-choice' as const,
-        category: 'goal-setting' as const,
-        question: `What would be a realistic timeline for mastering the concepts presented in this video?`,
-        options: ["1-2 weeks", "1-2 months", "3-6 months", "6-12 months"],
-        correctAnswer: "3-6 months"
-      },
-      {
-        id: 7,
-        type: 'open-ended' as const,
-        category: 'goal-setting' as const,
-        question: `Based on this video, what specific, measurable goal will you set for yourself in the next 30 days?`
-      },
-      {
-        id: 8,
-        type: 'open-ended' as const,
-        category: 'application' as const,
-        question: `What challenges do you anticipate when implementing these concepts, and how will you overcome them?`
-      }
-    ];
-    
-    console.log('Enhanced quiz generated successfully');
     
     return {
       videoId,
       videoTitle,
-      questions: allQuestions,
+      questions: transformedQuestions,
       summary: videoSummary
     };
 
   } catch (error) {
-    console.error('Error generating enhanced quiz:', error);
+    console.error('Error generating AI quiz:', error);
     return null;
   }
 };

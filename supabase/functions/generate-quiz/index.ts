@@ -20,63 +20,69 @@ serve(async (req) => {
       throw new Error('Google API key not configured');
     }
 
-    const prompt = `You are an instructional designer specializing in educational psychology and Bloom's Taxonomy.
+    const prompt = `You are an expert instructional designer and educational psychologist specializing in personalized learning and Bloom's Taxonomy.
 
-**Task:**  
-Given the transcript of an informative video, generate exactly **10 quiz questions**:
-- 8 **MCQs** (with 4 options each, one correct answer)  
-- 2 **open-response** questions requiring a long-form answer
+**Context:** You will receive a YouTube video transcript along with the video title. Your task is to create a comprehensive learning assessment that helps learners deeply engage with and retain the video content.
 
-Video Title: ${videoTitle}
-Video Description: ${videoDescription || 'Not provided'}
-Transcript: ${transcript}
+**Task:** Generate exactly **8 quiz questions** based on the specific video content:
+- 6 **MCQs** (multiple choice with 4 options each)
+- 2 **open-response** questions for deep reflection
 
-Distribute questions across Bloom's revised cognitive levels:
+**Video Title:** ${videoTitle}
+**Video Description:** ${videoDescription || 'Not provided'}
+**Transcript:** ${transcript}
 
-**MCQs:**
-1. **Remember** – 2 questions (factual recall from the video content)
-2. **Understand** – 2 questions (comprehension of key concepts)
-3. **Apply / Analyze** – 2 questions (practical use or analysis of content)
-4. **Evaluate** – 2 questions (judgment or critique based on video)
+**Question Distribution by Bloom's Taxonomy:**
 
-**Open-response (long answer):**
-5. **Analyze / Evaluate** – 1 question (deep analysis or evaluation)
-6. **Create** – 1 question (design or synthesis)
+**MCQs (1-6):**
+1. **Remember** (1 question): Key facts, terminology, or specific details mentioned in the video
+2. **Understand** (2 questions): Main concepts, explanations, or cause-and-effect relationships
+3. **Apply** (2 questions): How to use the knowledge in real scenarios or new contexts
+4. **Analyze/Evaluate** (1 question): Compare concepts, critique ideas, or identify patterns
 
-**CRITICAL REQUIREMENTS:**
-- All questions MUST be based on actual content from the transcript
-- Use specific details, facts, and concepts mentioned in the video
-- Avoid generic questions that could apply to any video
-- MCQ options should include plausible distractors based on video content
-- Questions should demonstrate you've analyzed the specific video content
+**Open-Response (7-8):**
+7. **Analyze/Evaluate**: Critical thinking about the content's implications, strengths/weaknesses, or real-world applications
+8. **Create/Synthesize**: Design, plan, or combine the video's concepts with personal experience or other knowledge
 
-**Format your output** exactly as follows JSON:
+**Quality Requirements:**
+- Extract specific details, examples, and terminology from the transcript
+- Reference the video title and main themes throughout questions
+- Use exact quotes or paraphrases from the transcript when relevant
+- Ensure wrong MCQ options are plausible but clearly incorrect
+- Make questions progressively more challenging
+- Connect content to practical, real-world applications
 
+**Output Format (JSON):**
 {
   "questions": [
     {
       "id": 1,
       "type": "multiple-choice",
       "category": "comprehension",
-      "question": "[Specific question based on video content]",
-      "options": ["A) Option based on video", "B) Option based on video", "C) Option based on video", "D) Option based on video"],
+      "question": "[specific question referencing video content]",
+      "options": ["A) [option]", "B) [option]", "C) [option]", "D) [option]"],
       "correctAnswer": "A"
     },
     {
-      "id": 10,
+      "id": 7,
       "type": "open-ended",
-      "category": "application", 
-      "question": "[Creative synthesis question based on video concepts]"
+      "category": "application",
+      "question": "[Detailed analytical prompt connecting to video specifics]"
+    },
+    {
+      "id": 8,
+      "type": "open-ended", 
+      "category": "application",
+      "question": "[Creative synthesis prompt building on video concepts]"
     }
   ]
 }
 
-**Instructions:**  
-- Return ONLY valid JSON with the questions array
-- Ensure each question clearly aligns with its Bloom's level  
-- Keep MCQs concise and focused on video content
-- Make open-response prompts specific to the video's teachings
-- Quality over generic: Every question should prove you understood THIS specific video`;
+**Instructions:**
+- Return ONLY valid JSON with exactly 8 questions
+- Base ALL questions on specific video content, not generic concepts
+- Make MCQ distractors plausible but clearly wrong based on video content
+- Ensure open-response questions require deep engagement with video material`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${googleApiKey}`, {
       method: 'POST',
