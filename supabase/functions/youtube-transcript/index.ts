@@ -163,62 +163,101 @@ function extractCaptionUrls(html: string): string[] {
   const urls: string[] = [];
   
   try {
-    // Look for caption tracks in the player config
+    console.log('Starting comprehensive caption URL extraction...');
+    
+    // Enhanced patterns for caption detection
     const patterns = [
+      // Standard caption tracks
       /"captionTracks":\s*\[(.*?)\]/,
       /"captions":\s*{[^}]*"playerCaptionsTracklistRenderer":\s*{[^}]*"captionTracks":\s*\[(.*?)\]/,
-      /\"baseUrl\":\"([^\"]+timedtext[^\"]+)\"/g
+      
+      // Direct baseUrl patterns
+      /\"baseUrl\":\"([^\"]+timedtext[^\"]+)\"/g,
+      /baseUrl.*?https:\\\/\\\/[^"]*timedtext[^"]*/g,
+      
+      // Alternative caption patterns
+      /"timedtext[^"]*"/g,
+      /https:\\?\/\\?\/[^"]*timedtext[^"]*/g,
+      
+      // Player response patterns
+      /"playerResponse":\s*"([^"]*captionTracks[^"]*)"/,
+      /"PLAYER_VARS":\s*{[^}]*"caption_tracks":\s*"([^"]*)"/
     ];
 
-    for (const pattern of patterns) {
-      const matches = html.match(pattern);
-      if (matches) {
-        console.log(`Found potential caption data with pattern: ${pattern.source.substring(0, 50)}...`);
-        
-        if (pattern.global) {
-          // Extract all baseUrl matches
-          let match;
-          const regex = new RegExp(pattern.source, 'g');
-          while ((match = regex.exec(html)) !== null) {
-            const url = match[1].replace(/\\u0026/g, '&').replace(/\\/g, '');
-            if (url.includes('timedtext')) {
-              urls.push(url);
-            }
+    // Try each pattern
+    for (let i = 0; i < patterns.length; i++) {
+      const pattern = patterns[i];
+      console.log(`Trying pattern ${i + 1}/${patterns.length}: ${pattern.source.substring(0, 50)}...`);
+      
+      if (pattern.global) {
+        let match;
+        const regex = new RegExp(pattern.source, 'g');
+        while ((match = regex.exec(html)) !== null) {
+          const url = match[1] ? match[1] : match[0];
+          const cleanUrl = url.replace(/\\u0026/g, '&').replace(/\\/g, '').replace(/"/g, '');
+          
+          if (cleanUrl.includes('timedtext') && !urls.includes(cleanUrl)) {
+            console.log(`Found caption URL via pattern ${i + 1}: ${cleanUrl.substring(0, 100)}...`);
+            urls.push(cleanUrl);
           }
-        } else {
-          // Try to parse the caption tracks
-          try {
-            const captionData = matches[1] || matches[0];
-            const urlMatches = captionData.match(/\"baseUrl\":\"([^\"]+)\"/g);
-            if (urlMatches) {
-              for (const urlMatch of urlMatches) {
-                const url = urlMatch.match(/\"baseUrl\":\"([^\"]+)\"/)?.[1];
-                if (url) {
-                  const cleanUrl = url.replace(/\\u0026/g, '&').replace(/\\/g, '');
+        }
+      } else {
+        const matches = html.match(pattern);
+        if (matches) {
+          console.log(`Found potential caption data with pattern ${i + 1}`);
+          
+          // Parse the matched content for URLs
+          const content = matches[1] || matches[0];
+          const baseUrlMatches = content.match(/\"baseUrl\":\"([^\"]+)\"/g) || 
+                                content.match(/baseUrl[^"]*"([^"]*timedtext[^"]*)"/g) ||
+                                content.match(/https[^"]*timedtext[^"]*/g);
+          
+          if (baseUrlMatches) {
+            for (const urlMatch of baseUrlMatches) {
+              let url = urlMatch.match(/\"baseUrl\":\"([^\"]+)\"/)?.[1] || 
+                       urlMatch.match(/baseUrl[^"]*"([^"]*)"/)?.[1] ||
+                       urlMatch.match(/(https[^"]*timedtext[^"]*)/)?.[1];
+              
+              if (url) {
+                const cleanUrl = url.replace(/\\u0026/g, '&').replace(/\\/g, '');
+                if (!urls.includes(cleanUrl)) {
+                  console.log(`Extracted caption URL: ${cleanUrl.substring(0, 100)}...`);
                   urls.push(cleanUrl);
                 }
               }
             }
-          } catch (e) {
-            console.error('Error parsing caption data:', e);
           }
         }
       }
     }
 
-    // Fallback: look for any timedtext URLs
-    const timedTextPattern = /https:\\?\/\\?\/[^"]*timedtext[^"]*/g;
-    const timedTextMatches = html.match(timedTextPattern);
-    if (timedTextMatches) {
-      for (const match of timedTextMatches) {
-        const cleanUrl = match.replace(/\\/g, '').replace(/\\u0026/g, '&');
-        if (!urls.includes(cleanUrl)) {
-          urls.push(cleanUrl);
-        }
+    // Additional fallback: search for any mention of transcript/caption APIs
+    if (urls.length === 0) {
+      console.log('No direct URLs found, trying alternative extraction...');
+      
+      // Look for video ID and construct potential caption URLs
+      const videoIdMatch = html.match(/"videoId":"([^"]+)"/);
+      if (videoIdMatch) {
+        const videoId = videoIdMatch[1];
+        console.log(`Found video ID: ${videoId}, constructing potential caption URLs...`);
+        
+        // Try common caption URL patterns
+        const potentialUrls = [
+          `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
+          `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=json3`,
+          `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
+          `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=srv3`
+        ];
+        
+        urls.push(...potentialUrls);
       }
     }
 
-    console.log(`Extracted ${urls.length} caption URLs`);
+    console.log(`Total extracted ${urls.length} caption URLs`);
+    urls.forEach((url, index) => {
+      console.log(`URL ${index + 1}: ${url.substring(0, 150)}...`);
+    });
+    
     return urls;
   } catch (error) {
     console.error('Error extracting caption URLs:', error);
