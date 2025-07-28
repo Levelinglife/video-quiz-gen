@@ -45,111 +45,7 @@ const analyzeVideoContent = (videoTitle: string, transcript: string) => {
   return contentType;
 };
 
-// Generate content-specific questions
-const generateContextualQuestions = (videoTitle: string, transcript: string, contentType: string) => {
-  const questions = [];
-  
-  // Extract key phrases from transcript for better contextualization
-  const keyPhrases = transcript.match(/\b[A-Z][a-z]+(?:\s+[a-z]+){1,3}\b/g) || [];
-  const firstSentence = transcript.split('.')[0];
-  const keyWords = [...new Set(transcript.toLowerCase().match(/\b[a-z]{4,}\b/g) || [])].slice(0, 10);
-  
-  switch (contentType) {
-    case 'programming':
-      questions.push(
-        {
-          id: 1,
-          type: 'multiple-choice' as const,
-          category: 'comprehension' as const,
-          question: `Based on "${videoTitle}", what is the primary programming concept being explained?`,
-          options: [
-            "Data structures and algorithms",
-            "Web development frameworks", 
-            "Software design patterns",
-            "Database management"
-          ],
-          correctAnswer: "Web development frameworks"
-        },
-        {
-          id: 3,
-          type: 'multiple-choice' as const,
-          category: 'application' as const,
-          question: `In the context of this programming tutorial, what would be the best approach to practice these concepts?`,
-          options: [
-            "Read documentation only",
-            "Build a small project applying these concepts",
-            "Watch more tutorials",
-            "Memorize the syntax"
-          ],
-          correctAnswer: "Build a small project applying these concepts"
-        }
-      );
-      break;
-      
-    case 'business':
-      questions.push(
-        {
-          id: 1,
-          type: 'multiple-choice' as const,
-          category: 'comprehension' as const,
-          question: `What is the main business strategy discussed in "${videoTitle}"?`,
-          options: [
-            "Market penetration and growth",
-            "Cost reduction strategies",
-            "Digital transformation",
-            "Customer relationship management"
-          ],
-          correctAnswer: "Market penetration and growth"
-        },
-        {
-          id: 3,
-          type: 'multiple-choice' as const,
-          category: 'application' as const,
-          question: `How could you implement these business strategies in a real-world scenario?`,
-          options: [
-            "Create a detailed implementation plan",
-            "Study competitor analysis first",
-            "Start with small pilot programs",
-            "Hire external consultants"
-          ],
-          correctAnswer: "Start with small pilot programs"
-        }
-      );
-      break;
-      
-    default:
-      questions.push(
-        {
-          id: 1,
-          type: 'multiple-choice' as const,
-          category: 'comprehension' as const,
-          question: `What is the central theme of "${videoTitle}"?`,
-          options: [
-            "Practical skill development",
-            "Theoretical understanding",
-            "Problem-solving techniques",
-            "Industry best practices"
-          ],
-          correctAnswer: "Practical skill development"
-        },
-        {
-          id: 3,
-          type: 'multiple-choice' as const,
-          category: 'application' as const,
-          question: `Based on the video content, what would be the most effective way to apply these learnings?`,
-          options: [
-            "Immediate practical implementation",
-            "Further research and study",
-            "Seeking mentorship or guidance",
-            "Creating a structured learning plan"
-          ],
-          correctAnswer: "Immediate practical implementation"
-        }
-      );
-  }
-  
-  return questions;
-};
+// Removed demo questions - now only using AI-generated content
 
 export const generateQuizFromVideo = async (
   videoId: string,
@@ -205,7 +101,7 @@ export const generateQuizFromVideo = async (
 
   } catch (error) {
     console.error('Error generating AI quiz:', error);
-    return null;
+    throw error;
   }
 };
 
