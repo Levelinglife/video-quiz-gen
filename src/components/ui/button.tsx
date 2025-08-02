@@ -18,6 +18,9 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        "gradient-primary": "bg-gradient-to-r from-dashboard-purple to-dashboard-blue text-white hover:from-dashboard-purple/90 hover:to-dashboard-blue/90 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 rounded-2xl",
+        "gradient-secondary": "bg-gradient-to-r from-dashboard-blue to-dashboard-purple text-white hover:from-dashboard-blue/90 hover:to-dashboard-purple/90 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 rounded-2xl",
+        "dashboard-icon": "bg-card text-muted-foreground hover:bg-accent hover:text-foreground border border-border transition-colors rounded-lg",
       },
       size: {
         default: "h-10 px-4 py-2",
