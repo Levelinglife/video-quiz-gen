@@ -84,47 +84,86 @@ serve(async (req) => {
 - Make MCQ distractors plausible but clearly wrong based on video content
 - Ensure open-response questions require deep engagement with video material`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${googleApiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: prompt
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.3,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 4096,
-        },
-        safetySettings: [
-          {
-            category: "HARM_CATEGORY_HARASSMENT",
-            threshold: "BLOCK_NONE"
-          },
-          {
-            category: "HARM_CATEGORY_HATE_SPEECH", 
-            threshold: "BLOCK_NONE"
-          },
-          {
-            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            threshold: "BLOCK_NONE"
-          },
-          {
-            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-            threshold: "BLOCK_NONE"
-          }
-        ]
-      }),
-    });
+    // Retry logic for API calls with exponential backoff
+    const maxRetries = 3;
+    let response;
+    let lastError;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Google Gemini API error: ${response.status} - ${errorText}`);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Attempt ${attempt}/${maxRetries} to call Gemini API`);
+        
+        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${googleApiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: prompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.3,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 4096,
+            },
+            safetySettings: [
+              {
+                category: "HARM_CATEGORY_HARASSMENT",
+                threshold: "BLOCK_NONE"
+              },
+              {
+                category: "HARM_CATEGORY_HATE_SPEECH", 
+                threshold: "BLOCK_NONE"
+              },
+              {
+                category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                threshold: "BLOCK_NONE"
+              },
+              {
+                category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                threshold: "BLOCK_NONE"
+              }
+            ]
+          }),
+        });
+
+        if (response.ok) {
+          console.log(`Gemini API call successful on attempt ${attempt}`);
+          break;
+        }
+
+        const errorText = await response.text();
+        lastError = new Error(`Google Gemini API error: ${response.status} - ${errorText}`);
+        
+        // If it's a rate limit or overload error (503, 429), retry after delay
+        if ((response.status === 503 || response.status === 429) && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+          console.log(`API overloaded (${response.status}), retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        // For other errors, don't retry
+        throw lastError;
+        
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxRetries && (error.message.includes('503') || error.message.includes('overloaded') || error.message.includes('429'))) {
+          const delay = Math.pow(2, attempt) * 1000;
+          console.log(`API error, retrying in ${delay}ms...`, error.message);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    if (!response || !response.ok) {
+      throw lastError || new Error('Failed to get response from Gemini API after retries');
     }
 
     const data = await response.json();
