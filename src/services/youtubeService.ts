@@ -25,48 +25,38 @@ export const extractVideoId = (url: string): string | null => {
 
 export const getVideoInfo = async (videoId: string): Promise<VideoInfo | null> => {
   try {
-    console.log(`Fetching video info for: ${videoId}`);
+    console.log(`Fetching REAL video metadata for: ${videoId}`);
     
-    // Try to get real video title using YouTube oEmbed API (no API key required)
-    try {
-      const oEmbedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
-      const response = await fetch(oEmbedUrl);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Video info fetched successfully:', data.title);
-        
-        return {
-          id: videoId,
-          title: data.title || `Video ${videoId}`,
-          description: 'Educational video content for quiz generation',
-          thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-          duration: '10:00',
-          channelTitle: data.author_name || 'YouTube Channel',
-          publishedAt: new Date().toISOString(),
-          viewCount: '1000'
-        };
-      }
-    } catch (oembedError) {
-      console.log('oEmbed failed, using fallback:', oembedError);
+    // ONLY get real video title using YouTube oEmbed API (no fallbacks)
+    const oEmbedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+    const response = await fetch(oEmbedUrl);
+    
+    if (!response.ok) {
+      console.error(`❌ YouTube oEmbed API failed: ${response.status} ${response.statusText}`);
+      throw new Error(`Video not found or not accessible. Please check the video URL and ensure it's public.`);
     }
     
-    // Fallback to mock data if oEmbed fails
-    const videoInfo = {
+    const data = await response.json();
+    
+    if (!data.title) {
+      throw new Error('Unable to fetch video information - video may be private or restricted.');
+    }
+    
+    console.log('✅ Real video info fetched successfully:', data.title);
+    
+    return {
       id: videoId,
-      title: `Educational Video ${videoId.substring(0, 6)}`,
+      title: data.title,
       description: 'Educational video content for quiz generation',
       thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
       duration: '10:00',
-      channelTitle: 'Educational Channel',
+      channelTitle: data.author_name || 'YouTube Channel',
       publishedAt: new Date().toISOString(),
       viewCount: '1000'
     };
-
-    console.log('Video info created successfully:', videoInfo.title);
-    return videoInfo;
+    
   } catch (error) {
-    console.error('Error creating video info:', error);
+    console.error('❌ Error fetching real video info:', error);
     throw error;
   }
 };
@@ -87,9 +77,9 @@ function parseDuration(duration: string): string {
 
 export const getTranscript = async (videoId: string): Promise<string | null> => {
   try {
-    console.log(`Fetching real transcript for video: ${videoId}`);
+    console.log(`Fetching REAL transcript/captions for video: ${videoId}`);
     
-    // Try to get real transcript from Supabase Edge Function first
+    // ONLY try to get real transcript from video captions - NO FALLBACKS
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
@@ -98,22 +88,21 @@ export const getTranscript = async (videoId: string): Promise<string | null> => 
       });
 
       if (!error && data && data.transcript && data.transcript.length > 100) {
-        console.log(`Real transcript fetched successfully! Length: ${data.transcript.length} characters`);
+        console.log(`✅ REAL transcript fetched successfully! Length: ${data.transcript.length} characters`);
+        console.log(`📝 Content preview: "${data.transcript.substring(0, 200)}..."`);
         return data.transcript;
       } else {
-        console.log('Supabase transcript extraction failed:', error?.message || 'No transcript data');
+        console.log('❌ No real captions found for this video:', error?.message || 'No transcript data');
+        return null;
       }
     } catch (supabaseError) {
-      console.log('Supabase Edge Function error:', supabaseError);
+      console.log('❌ Caption extraction service error:', supabaseError);
+      return null;
     }
     
-    // Intelligent fallback - create contextual transcript when captions are unavailable
-    console.log('Real transcript extraction failed - creating intelligent fallback');
-    return createIntelligentTranscript(videoId);
-    
   } catch (error) {
-    console.error('Error getting transcript:', error);
-    throw error;
+    console.error('❌ Error getting real transcript:', error);
+    return null;
   }
 };
 
@@ -278,44 +267,5 @@ export const getTranscriptWithDetails = async (videoId: string): Promise<Transcr
   }
 };
 
-// Create intelligent transcript when captions are unavailable
-async function createIntelligentTranscript(videoId: string): Promise<string> {
-  try {
-    // Get video metadata to create contextual content
-    const videoInfo = await getVideoInfo(videoId);
-    if (!videoInfo) {
-      throw new Error('Unable to get video information');
-    }
-
-    const title = videoInfo.title;
-    const description = videoInfo.description || '';
-    
-    // Create contextual transcript based on title and description
-    const transcript = `Welcome to this educational presentation: "${title}". 
-
-In this video, we explore the key concepts and important topics related to ${title.toLowerCase()}. The presenter discusses fundamental principles and provides detailed explanations to help viewers understand the subject matter thoroughly.
-
-Throughout this presentation, several important points are covered:
-
-First, we examine the basic foundations and core concepts that are essential for understanding this topic. The discussion includes relevant background information and context that helps establish a solid knowledge base.
-
-Next, the video delves into practical applications and real-world examples that demonstrate how these concepts can be implemented effectively. The presenter shares insights from experience and provides guidance on best practices.
-
-The presentation also covers common challenges and potential solutions, helping viewers anticipate and overcome obstacles they might encounter when applying these concepts in practice.
-
-Additionally, the video explores advanced techniques and strategies that can help viewers take their understanding to the next level. These insights are particularly valuable for those looking to develop expertise in this area.
-
-Throughout the discussion, emphasis is placed on the importance of continued learning and practice. The presenter encourages viewers to apply what they've learned and to seek out additional resources for further development.
-
-The video concludes with a summary of key takeaways and recommendations for next steps. This helps reinforce the main concepts and provides viewers with a clear path forward for continued learning and improvement.
-
-Overall, this educational content provides valuable insights and practical knowledge that can be applied in various contexts and situations.`;
-
-    console.log(`Created intelligent transcript for ${title} - Length: ${transcript.length} characters`);
-    return transcript;
-    
-  } catch (error) {
-    console.error('Error creating intelligent transcript:', error);
-    throw new Error('Unable to process video content for quiz generation');
-  }
-}
+// REMOVED: createIntelligentTranscript function
+// We only generate quizzes from REAL video captions, never fake content

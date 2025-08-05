@@ -55,8 +55,8 @@ const QuizGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
       addDebugInfo('Trying: YouTube API, Direct Caption Fetch, Alternative Methods...');
       
       const transcript = await getTranscript(videoId);
-      if (!transcript) {
-        throw new Error('Unable to extract transcript from this video. This could be because:\n• The video is private or restricted\n• No captions are available for this video\n• The video is too new and captions haven\'t been generated yet\n• The video content doesn\'t support automatic caption generation\n\nPlease try a different video with visible captions (CC button should be available on YouTube).');
+      if (!transcript || transcript.length < 200) {
+        throw new Error('❌ NO CAPTIONS FOUND - This video does not have captions/subtitles available.\n\n🎯 REQUIREMENT: This app ONLY works with videos that have REAL captions.\n\n✅ Please try videos with:\n• Visible CC (closed captions) button on YouTube\n• Educational content (TED Talks, Khan Academy, lectures)\n• Professional content with transcripts\n• Popular videos with auto-generated captions\n\n🚫 Videos without captions cannot be processed.\n\n💡 TIP: Look for the CC button in the YouTube player controls - if it\'s not there or grayed out, the video won\'t work with this tool.');
       }
       
       addDebugInfo(`🎉 SUCCESS! Transcript extracted - ${transcript.length} characters`);

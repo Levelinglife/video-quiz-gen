@@ -20,37 +20,66 @@ serve(async (req) => {
       throw new Error('Google API key not configured');
     }
 
-    const prompt = `You are an expert instructional designer and educational psychologist specializing in personalized learning and Bloom's Taxonomy.
+    // STRICT VALIDATION: Ensure we have real transcript content
+    if (!transcript || transcript.length < 200) {
+      throw new Error('Invalid or insufficient transcript content - quiz generation requires real video captions with at least 200 characters');
+    }
 
-**Context:** You will receive a YouTube video transcript along with the video title. Your task is to create a comprehensive learning assessment that helps learners deeply engage with and retain the video content.
+    // Additional validation: Check for common fake/generic content patterns
+    const genericPatterns = [
+      'welcome to this educational presentation',
+      'in this video, we explore',
+      'the presenter discusses fundamental principles',
+      'throughout this presentation',
+      'this educational content provides'
+    ];
+    
+    const lowerTranscript = transcript.toLowerCase();
+    const hasGenericContent = genericPatterns.some(pattern => lowerTranscript.includes(pattern));
+    
+    if (hasGenericContent) {
+      throw new Error('Detected generic/template content instead of real video transcript - only actual video captions are allowed');
+    }
 
-**Task:** Generate exactly **8 quiz questions** based on the specific video content:
-- 6 **MCQs** (multiple choice with 4 options each)
-- 2 **open-response** questions for deep reflection
+    console.log(`✅ Validated real transcript: ${transcript.length} characters, video: "${videoTitle}"`);
+    console.log(`📝 Transcript preview: "${transcript.substring(0, 150)}..."`);
+
+
+    const prompt = `You are an expert instructional designer and educational psychologist specializing in creating complex, analytical quiz questions based on specific video content.
+
+**CRITICAL REQUIREMENT:** You MUST create questions based ONLY on the actual video transcript provided. DO NOT create generic questions. Every question must reference specific details, quotes, examples, or concepts mentioned in the transcript.
 
 **Video Title:** ${videoTitle}
 **Video Description:** ${videoDescription || 'Not provided'}
-**Transcript:** ${transcript}
+**ACTUAL VIDEO TRANSCRIPT:** ${transcript}
 
-**Question Distribution by Bloom's Taxonomy:**
+**Task:** Generate exactly **8 complex quiz questions** that test deep understanding of the specific video content:
+- 6 **MCQs** (multiple choice with 4 options each) - focus on specific details, quotes, concepts from the transcript
+- 2 **open-response** questions for critical analysis of the specific content discussed
 
-**MCQs (1-6):**
-1. **Remember** (1 question): Key facts, terminology, or specific details mentioned in the video
-2. **Understand** (2 questions): Main concepts, explanations, or cause-and-effect relationships
-3. **Apply** (2 questions): How to use the knowledge in real scenarios or new contexts
-4. **Analyze/Evaluate** (1 question): Compare concepts, critique ideas, or identify patterns
+**Question Complexity Requirements:**
+1. **Specific Content References**: Every question must reference specific details, examples, or quotes from the transcript
+2. **No Generic Questions**: Avoid general knowledge questions - focus on what was actually said in this video
+3. **Deep Analysis**: Questions should test understanding, not just recall
+4. **Complex Scenarios**: Use real examples or scenarios mentioned in the video
+5. **Technical Details**: Include specific terminology, numbers, processes mentioned in the transcript
+
+**MCQs (1-6) - Based on Bloom's Taxonomy:**
+1. **Remember** (1 question): Specific facts, quotes, or exact details mentioned in the video
+2. **Understand** (2 questions): Concepts, explanations, or cause-and-effect relationships from the transcript
+3. **Apply** (2 questions): How to use specific knowledge/techniques discussed in the video
+4. **Analyze** (1 question): Compare specific concepts, critique ideas, or identify patterns mentioned in the video
 
 **Open-Response (7-8):**
-7. **Analyze/Evaluate**: Critical thinking about the content's implications, strengths/weaknesses, or real-world applications
-8. **Create/Synthesize**: Design, plan, or combine the video's concepts with personal experience or other knowledge
+7. **Critical Analysis**: Analyze specific implications, strengths/weaknesses of concepts discussed in the video
+8. **Complex Application**: How would you apply/implement the specific techniques or ideas presented in the video
 
 **Quality Requirements:**
-- Extract specific details, examples, and terminology from the transcript
-- Reference the video title and main themes throughout questions
-- Use exact quotes or paraphrases from the transcript when relevant
-- Ensure wrong MCQ options are plausible but clearly incorrect
-- Make questions progressively more challenging
-- Connect content to practical, real-world applications
+- Quote or reference specific parts of the transcript in each question
+- Use exact terminology and concepts from the video
+- Include specific examples, case studies, or scenarios mentioned in the transcript
+- Make wrong MCQ options plausible but clearly incorrect based on video content
+- Ensure questions require knowledge of the actual video content to answer correctly
 
 **Output Format (JSON):**
 {
@@ -59,30 +88,26 @@ serve(async (req) => {
       "id": 1,
       "type": "multiple-choice",
       "category": "comprehension",
-      "question": "[specific question referencing video content]",
-      "options": ["A) [option]", "B) [option]", "C) [option]", "D) [option]"],
+      "question": "[Question referencing specific transcript content with quotes or examples]",
+      "options": ["A) [option based on video]", "B) [option based on video]", "C) [option based on video]", "D) [option based on video]"],
       "correctAnswer": "A"
     },
     {
       "id": 7,
       "type": "open-ended",
-      "category": "application",
-      "question": "[Detailed analytical prompt connecting to video specifics]"
+      "category": "analysis",
+      "question": "[Complex analytical question about specific video concepts]"
     },
     {
       "id": 8,
       "type": "open-ended", 
       "category": "application",
-      "question": "[Creative synthesis prompt building on video concepts]"
+      "question": "[Implementation question based on specific video techniques/methods]"
     }
   ]
 }
 
-**Instructions:**
-- Return ONLY valid JSON with exactly 8 questions
-- Base ALL questions on specific video content, not generic concepts
-- Make MCQ distractors plausible but clearly wrong based on video content
-- Ensure open-response questions require deep engagement with video material`;
+**CRITICAL:** Return ONLY valid JSON. Base ALL questions on the specific video transcript - no generic educational content allowed.`;
 
     // Retry logic for API calls with exponential backoff
     const maxRetries = 3;
