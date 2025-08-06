@@ -235,22 +235,18 @@ function extractCaptionUrls(html: string): string[] {
     if (urls.length === 0) {
       console.log('No direct URLs found, trying alternative extraction...');
       
-      // Look for video ID and construct potential caption URLs
-      const videoIdMatch = html.match(/"videoId":"([^"]+)"/);
-      if (videoIdMatch) {
-        const videoId = videoIdMatch[1];
-        console.log(`Found video ID: ${videoId}, constructing potential caption URLs...`);
-        
-        // Try common caption URL patterns
-        const potentialUrls = [
-          `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
-          `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=json3`,
-          `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
-          `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=srv3`
-        ];
-        
-        urls.push(...potentialUrls);
-      }
+      // Use the videoId parameter that was passed to the function
+      console.log(`Using passed videoId parameter for fallback URLs`);
+      
+      // Try common caption URL patterns with the correct video ID
+      const potentialUrls = [
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=json3`,
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=srv3`
+      ];
+      
+      urls.push(...potentialUrls);
     }
 
     console.log(`Total extracted ${urls.length} caption URLs`);
