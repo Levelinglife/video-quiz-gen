@@ -127,7 +127,7 @@ async function extractTranscriptFromWatchPage(videoId: string) {
     console.log(`Received HTML page, length: ${html.length}`);
 
     // Extract caption track URLs from the page
-    const captionUrls = extractCaptionUrls(html);
+    const captionUrls = extractCaptionUrls(html, videoId);
     console.log(`Found ${captionUrls.length} caption tracks`);
 
     if (captionUrls.length === 0) {
@@ -159,7 +159,7 @@ async function extractTranscriptFromWatchPage(videoId: string) {
   }
 }
 
-function extractCaptionUrls(html: string): string[] {
+function extractCaptionUrls(html: string, videoId: string): string[] {
   const urls: string[] = [];
   
   try {
